@@ -1,31 +1,36 @@
 from GUI.gui_view import GUIView
-from ServerRequests.server_requests import ServerRequests
+from GUI.gui_model import GUIModel
 
 
 class GUIController:
     """ Controller voor het main screen """
 
     def __init__(self):
-        self.view = GUIView()
+        self.view = GUIView(self.time_range_changed_CB)
+        self.model = GUIModel(self.view)
         self.view.connectEvents(
             {
                 'nuSelected': self.nuSelected,
-                'fromChanged': self.fromChanged,
-                'toChanged': self.toChanged,
+                'dagenSelected': self.dagenSelected,
+                'timeRangeChanged': self.timeRangeChanged,
             }
         )
-        self.data = None
         self.view.show()
+
+    def time_range_changed_CB(self, time_range):
+        self.model.set_time_range(time_range)
 
     def nuSelected(self):
         print("nuSelected")
-        self.data = ServerRequests().get_data()
-        self.view.initTimeFrame()
-        self.view.show_data(self.data)
+        self.model.acquire_data('realtime')
+#        self.update_to_time()
 
-    def fromChanged(self):
-        self.view.show_data(self.data)
+    def dagenSelected(self):
+        print("dagenSelected")
+        self.model.acquire_data('persistent')
+        self.view.show_data(self.model.get_data(), self.model.get_time_range())
 
-    def toChanged(self):
-        self.view.show_data(self.data)
+    def timeRangeChanged(self):
+        time_range = self.view.get_time_range()
+        self.model.set_time_range(time_range)
 
