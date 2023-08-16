@@ -3,7 +3,7 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from PyQt6.QtWidgets import QApplication
-from Utils.settings import Settings
+from Utils.config import Config
 from GUI.gui_controller import GUIController
 
 
@@ -12,7 +12,7 @@ class Application:
     def __init__(self):
         app = QApplication(sys.argv)
         contr = GUIController()
-        initializeLogging(Settings().getLoggingPath())
+        initializeLogging(Config().getLoggingPath())
         sys.exit(app.exec())
 
 
@@ -22,7 +22,7 @@ def initializeLogging(pathToFile):
     if not os.path.exists(pathToFile):
         os.makedirs(pathToFile)
         print('Directory {} aangemaakt'.format(pathToFile))  # Qt is nog niet in de lucht, dus geen QMessageBox
-    filename = Settings().getLoggingFilename()
+    filename = Config().getLoggingFilename()
     filepath = os.path.join(pathToFile, filename)
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
