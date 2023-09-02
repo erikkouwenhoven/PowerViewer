@@ -4,6 +4,8 @@ from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
 from Utils.settings import Settings
 from Utils.unit_standardizer import UnitStandardizer
+from Algorithms.signal_shift import SignalShift
+from Algorithms.derived_signal import Operation
 
 
 class GUIModel:
@@ -13,22 +15,27 @@ class GUIModel:
         self.data_stores: list[DataStore] = GUIModel.init_data_stores()
 
     @staticmethod
-    def init_data_stores() -> list[DataStore]:  # TODO moet uiteindelijk via request naar PowerLogger
-        signals = [
-            "CURRENT_USAGE",
-            "CURRENT_PRODUCTION",
-            "SOLAR",
-            "CURRENT_USAGE_PHASE1",
-            "CURRENT_USAGE_PHASE2",
-            "CURRENT_USAGE_PHASE3",
-            "CURRENT_PRODUCTION_PHASE1",
-            "CURRENT_PRODUCTION_PHASE2",
-            "CURRENT_PRODUCTION_PHASE3"
-        ]
-        return [
-            DataStore(name="realtime", database="realtime", signals=[signal for signal in signals if Settings().getSignalCheckState("realtime", signal) is True]),
-            DataStore(name="persistent", database="persistent", signals=[signal for signal in signals if Settings().getSignalCheckState("persistent", signal) is True])
-        ]
+    def init_data_stores() -> list[DataStore]:
+        try:
+            data_stores = []
+            data_store_ids = ServerRequests().get_data_stores()
+            for data_store_id in data_store_ids:
+                data_store_info = ServerRequests().get_data_store_info(data_store_id)
+                data_stores.append(DataStore(name=data_store_info["Name"], signals=data_store_info["Signals"], database=data_store_info["Db"]))
+        except Exception:
+            raise RuntimeError("Connection failure")
+        # signals = [
+        #     "CURRENT_USAGE",
+        #     "CURRENT_PRODUCTION",
+        #     "SOLAR",
+        #     "CURRENT_USAGE_PHASE1",
+        #     "CURRENT_USAGE_PHASE2",
+        #     "CURRENT_USAGE_PHASE3",
+        #     "CURRENT_PRODUCTION_PHASE1",
+        #     "CURRENT_PRODUCTION_PHASE2",
+        #     "CURRENT_PRODUCTION_PHASE3"
+        # ]
+        return data_stores
 
     def update_data_stores(self):
         self.data_stores = self.init_data_stores()
@@ -40,7 +47,8 @@ class GUIModel:
 
     def acquire_data(self, data_store: DataStore):
         try:
-            orig_data = ServerRequests().get_data(f'?mode={data_store.database}')
+            orig_data = ServerRequests().get_data(f'?{data_store.name}')
+            # orig_data["SOLAR"] = SignalShift(Operation.fix_signal(orig_data["SOLAR"])).do_shift(-2.0 if data_store.name == "realtime" else -2.0/6.0)  # TODO dit hoort niet hier
             data_store.data = {k: v for k, v in orig_data.items() if k != "units" and k in data_store.signals or k == "timestamp"}
             units = orig_data["units"]
             UnitStandardizer().execute(units, data_store.data, data_store.signals)
@@ -54,7 +62,7 @@ class GUIModel:
         for i, t in enumerate(data_store.data['timestamp']):
             if i != 0:
                 delta_t = t - t_prev
-                if delta_t > {'realtime': 11, 'persistent': 66}[data_store.name]:
+                if delta_t > {'real_time': 11, 'persistent': 66}[data_store.name]:
                     print(f"delta = {delta_t} @ t = {datetime.fromtimestamp(t_prev)} > {datetime.fromtimestamp(t)}")
             t_prev = t
 
@@ -93,3 +101,5 @@ class GUIModel:
                 return m
             if hi - lo <= 1:
                 return lo
+
+

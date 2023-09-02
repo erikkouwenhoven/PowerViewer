@@ -1,0 +1,54 @@
+
+te doen:
+- automatisch bij start weergave vanuit realtime database
+- selecteren database
+- tijdrange aangeven waarin data beschikbaar is, achter de settings
+- instellingen viewer opslaan
+
+- afgeleide signalen en parameters berekenen
+
+    Class DerivedSignal:
+        Name: Verbruik
+        formula_text: SOLAR - CURRENT_PRODUCTION_PHASE1 + CURRENT_USAGE_PHASE1
+
+        function exec_code(formula: Formula(text), data) -> list[float]
+            op = formula.evaluate()
+            return op.exec()
+
+
+    Class Operation(operator, operand1, operand2):
+
+        def exec()
+            if type(operand1) == operation:
+                return operand1.exec() + operand2
+            else
+                return operand1 + operand2
+
+    Class Formula(formula)
+        self.num = 0
+        function check_syntax
+
+        function evaluate
+            op = operation(formula.first_binary_part)
+            while formula.next_fragment:
+              op = operation(op, next_binary_fragment)
+            return op
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.num > len(self.formula):
+            raise StopIteration
+        else:
+            self.num += 1
+            if self.num == 0:
+                self.num = 3
+                return self.formula[0], self.formula[1], self.formula[2]
+            else:
+                self.num += 2
+                return self.formula[self.num - 2], self.formula[self.num - 2 + 1]
+
+
+
+)

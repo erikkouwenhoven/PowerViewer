@@ -1,6 +1,6 @@
 import json
 from Utils.config import Config
-from Application.derived_signal import DerivedSignal
+from Algorithms.derived_signal import DerivedSignal
 
 
 class Settings:

@@ -11,8 +11,8 @@ class Application:
 
     def __init__(self):
         app = QApplication(sys.argv)
-        contr = GUIController()
         initializeLogging(Config().getLoggingPath())
+        contr = GUIController()
         sys.exit(app.exec())
 
 

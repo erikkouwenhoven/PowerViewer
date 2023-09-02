@@ -3,6 +3,8 @@ from Utils.config import Config
 from GUI.gui_view import GUIView
 from GUI.gui_model import GUIModel
 from Models.data_store import DataStore
+from Algorithms.signal_shift import SignalShift
+from GUI.time_delay_controller import TimeDelayController
 
 
 class GUIController:
@@ -17,6 +19,7 @@ class GUIController:
                 'showSettings': self.activateSettings,
                 'dataStoreSelected': self.dataStoreSelected,
                 'signalsTableChanged': self.signalsTableChanged,
+                'calcSolarDelay': self.calcSolarDelay,
             }
         )
         self.initialize()
@@ -53,6 +56,14 @@ class GUIController:
         self.model.update_data_stores()
         datastore = self.model.get_data_store(datastore_name)
         self.acquire_and_show(datastore)
+
+    def calcSolarDelay(self):
+        datastore_name = self.view.get_data_store_name()
+        datastore = self.model.get_data_store(datastore_name)
+        signal_shift = SignalShift(datastore.data["SOLAR"])
+        shift = signal_shift.assess_shift(datastore.data["CURRENT_PRODUCTION_PHASE3"], kernel_size=6)
+        TimeDelayController(signal_shift.cross_corr, shift)
+        print(shift)
 
     def acquire_and_show(self, datastore: DataStore):
         self.model.acquire_data(datastore)

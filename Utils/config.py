@@ -23,6 +23,12 @@ class Config:
     def get_data_url(self):
         return self.config.get('CONNECTION', 'get_data_url')
 
+    def get_data_stores_url(self):
+        return self.config.get('CONNECTION', 'get_data_stores_url')
+
+    def get_data_store_info_url(self, data_store):
+        return self.config.get('CONNECTION', 'get_data_store_info_url') + f'?{data_store}'
+
     def getUiDirName(self):
         return self.config.get('PATHS', 'ui')
 
@@ -37,6 +43,9 @@ class Config:
 
     def getMainScreenFileName(self):
         return self.config.get('UI', 'mainscreen')
+
+    def getTimeDelayDialogFileName(self):
+        return self.config.get('UI', 'timedelay')
 
     def getAppName(self):
         return self.config.get('APPINFO', 'appname')

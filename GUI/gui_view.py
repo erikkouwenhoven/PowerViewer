@@ -55,6 +55,8 @@ class GUIView(QMainWindow):
                 self.ui.signalsTableWidget.cellChanged.connect(value)
             if key == "showSettings":
                 self.actionCallbacks['showSettings'] = value
+            if key == "calcSolarDelay":
+                self.actionCallbacks['calcSolarDelay'] = value
 
     def connect_mpl_events(self):
         self.ui.mplWidget.canvas.mpl_connect('pick_event', self.on_pick)
@@ -66,9 +68,12 @@ class GUIView(QMainWindow):
     def showContextMenu(self, position):
         menu = QMenu()
         settingsAction = menu.addAction("Settings")
+        solarDelayAction = menu.addAction("Assess Solar delay")
         action = menu.exec(self.ui.mplWidget.mapToGlobal(position))
         if action == settingsAction:
             self.actionCallbacks['showSettings']()
+        elif action == solarDelayAction:
+            self.actionCallbacks['calcSolarDelay']()
 
     def hideSettings(self):
         self.ui.settingsGroupBox.setChecked(False)
