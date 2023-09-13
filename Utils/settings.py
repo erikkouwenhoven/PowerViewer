@@ -18,22 +18,22 @@ class Settings:
         with open(Config().getSettingsFilename(), 'w') as file:
             json.dump(self.settings, file, indent=4)
 
-    def getSignalCheckState(self, datastore, signal):
+    def getSignalCheckState(self, datastore_name, signal):
         c_DEFAULT_STATE = True
         if "SignalCheckStates" in self.settings:
-            if datastore in self.settings["SignalCheckStates"]:
-                if signal in self.settings["SignalCheckStates"][datastore]:
-                    return self.settings["SignalCheckStates"][datastore][signal]
+            if datastore_name in self.settings["SignalCheckStates"]:
+                if signal in self.settings["SignalCheckStates"][datastore_name]:
+                    return self.settings["SignalCheckStates"][datastore_name][signal]
                 else:
-                    self.settings["SignalCheckStates"][datastore][signal] = c_DEFAULT_STATE
+                    self.settings["SignalCheckStates"][datastore_name][signal] = c_DEFAULT_STATE
                     self.update()
                     return c_DEFAULT_STATE
             else:
-                self.settings["SignalCheckStates"][datastore] = {signal: c_DEFAULT_STATE}
+                self.settings["SignalCheckStates"][datastore_name] = {signal: c_DEFAULT_STATE}
                 self.update()
                 return c_DEFAULT_STATE
         else:
-            self.settings["SignalCheckStates"] = {datastore: {signal: c_DEFAULT_STATE}}
+            self.settings["SignalCheckStates"] = {datastore_name: {signal: c_DEFAULT_STATE}}
             self.update()
             return c_DEFAULT_STATE
 
@@ -43,7 +43,23 @@ class Settings:
         self.update()
 
     def getSignalCheckStates(self, datastore_name: str):
-        return {signal: self.settings["SignalCheckStates"][datastore_name][signal] for signal in self.settings["SignalCheckStates"][datastore_name]}
+        try:
+            return {signal: self.settings["SignalCheckStates"][datastore_name][signal] for signal in self.settings["SignalCheckStates"][datastore_name]}
+        except KeyError:
+            return None
+
+    def set_visibilities(self, visibilities: dict[str, bool]):
+        if "SignalVisibilities" not in self.settings:
+            self.settings["SignalVisibilities"] = {}
+        for signal in visibilities:
+            self.settings["SignalVisibilities"][signal] = visibilities[signal]
+        self.update()
+
+    def get_visibilities(self):
+        try:
+            return {signal: self.settings["SignalVisibilities"][signal] for signal in self.settings["SignalVisibilities"]}
+        except KeyError:
+            return None
 
     def getDerivedSignals(self, data):
         if "DerivedSignals" in self.settings:

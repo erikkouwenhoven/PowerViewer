@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from GUI.Tools.time_format import logging_fmt
 from PyQt6.QtWidgets import QApplication
 from Utils.config import Config
 from GUI.gui_controller import GUIController
@@ -26,7 +27,7 @@ def initializeLogging(pathToFile):
     filepath = os.path.join(pathToFile, filename)
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
-                        datefmt='%m-%d %H:%M:%S',
+                        datefmt=logging_fmt,
                         filename=filepath,
                         filemode='w')
     logging.getLogger().addHandler(RotatingFileHandler(filepath, maxBytes=100000, backupCount=10))

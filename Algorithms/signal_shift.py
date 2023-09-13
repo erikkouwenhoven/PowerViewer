@@ -1,10 +1,12 @@
 import math
+from Utils.config import Config
+from Models.data_store import Signal
 from Algorithms.golden_section_search import gssrec
 
 
 class SignalShift:
 
-    def __init__(self, signal: list[float]):
+    def __init__(self, signal: Signal):
         self.signal = signal
         self.cross_corr = None
 
@@ -12,20 +14,28 @@ class SignalShift:
         assert len(self.signal) == len(other_signal)
         self.cross_corr = self.calc_cross_corr(self.signal, other_signal, kernel_size)
         peaked_signal = PeakedSignal({t - kernel_size: v for t, v in enumerate(self.cross_corr[1])})
-        return peaked_signal.find_maximum(search_range=3)  # TODO naar config
+        return peaked_signal.find_maximum(search_range=Config().getSearchRangeMaxCrossCorr())
 
     @staticmethod
     def calc_cross_corr(x_data, y_data, kernel_size):
         x_fix = [x_val if x_val else 0.0 for x_val in x_data]
         y_fix = [y_val if y_val else 0.0 for y_val in y_data]
-        x_demean = [x_val - sum(x_fix) / len(x_fix) for x_val in x_fix]
-        y_demean = [y_val - sum(y_fix) / len(y_fix) for y_val in y_fix]
+        x_mean = sum(x_fix) / len(x_fix)
+        y_mean = sum(y_fix) / len(y_fix)
+        x_demean = [x_val - x_mean for x_val in x_fix]
+        y_demean = [y_val - y_mean for y_val in y_fix]
+        std_x = math.sqrt(sum([x**2 for x in x_demean]) / len(x_demean))
+        std_y = math.sqrt(sum([y**2 for y in y_demean]) / len(y_demean))
         cc = [0.0] * (2*kernel_size + 1)
         t = [-kernel_size + i for i in range(2*kernel_size + 1)]
         for i, x_val in enumerate(x_demean):
-            y_range = max(0, i - kernel_size), min(len(x_demean)-1, i + kernel_size)
-            for j in range(y_range[0], y_range[1] + 1):
-                cc[j + kernel_size - i] += x_val * y_demean[j]
+            y_lims = max(0, i - kernel_size), min(len(x_demean)-1, i + kernel_size)
+            y_range = range(y_lims[0], y_lims[1] + 1)
+            if not (all([y_fix[i_y] == 0.0 for i_y in y_range]) and x_fix[i] == 0.0):
+                for j in range(y_lims[0], y_lims[1] + 1):
+                    cc[j + kernel_size - i] += x_val * y_demean[j]
+        for i, cc_val in enumerate(cc):
+            cc[i] /= (std_x * std_y * len(x_demean))
         return t, cc
 
     def do_shift(self, shift: float) -> list[float]:

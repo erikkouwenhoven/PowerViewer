@@ -1,40 +1,39 @@
+import logging
+import json
 from datetime import datetime, timedelta
-from Models.data_store import DataStore
+from Models.data_store import DataStore, Signal
 from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
 from Utils.settings import Settings
 from Utils.unit_standardizer import UnitStandardizer
-from Algorithms.signal_shift import SignalShift
-from Algorithms.derived_signal import Operation
 
 
 class GUIModel:
 
-    def __init__(self):
-        self.time_range = None  # self.init_time_range()
-        self.data_stores: list[DataStore] = GUIModel.init_data_stores()
+    _c_MOCK_FILE_NAME: str = 'sample.json'
+    c_MOCK_DATASTORE_NAME: str = 'localfile'
 
-    @staticmethod
-    def init_data_stores() -> list[DataStore]:
+    def __init__(self):
+        self.time_range = None
+        self.working_connection = False
+        self.data_stores: list[DataStore] = self.init_data_stores()
+
+    def init_data_stores(self) -> list[DataStore]:
+        data_stores = []
         try:
-            data_stores = []
             data_store_ids = ServerRequests().get_data_stores()
             for data_store_id in data_store_ids:
                 data_store_info = ServerRequests().get_data_store_info(data_store_id)
-                data_stores.append(DataStore(name=data_store_info["Name"], signals=data_store_info["Signals"], database=data_store_info["Db"]))
-        except Exception:
-            raise RuntimeError("Connection failure")
-        # signals = [
-        #     "CURRENT_USAGE",
-        #     "CURRENT_PRODUCTION",
-        #     "SOLAR",
-        #     "CURRENT_USAGE_PHASE1",
-        #     "CURRENT_USAGE_PHASE2",
-        #     "CURRENT_USAGE_PHASE3",
-        #     "CURRENT_PRODUCTION_PHASE1",
-        #     "CURRENT_PRODUCTION_PHASE2",
-        #     "CURRENT_PRODUCTION_PHASE3"
-        # ]
+                signals = [signal for signal in data_store_info["Signals"] if Settings().getSignalCheckState(data_store_info["Name"], signal) is True]
+                data_stores.append(DataStore(name=data_store_info["Name"], signals=signals, database=data_store_info["Db"]))
+            self.working_connection = True
+        except Exception as err:
+            logging.debug(f"Connection error {err}")
+            self.working_connection = False
+            with open(self._c_MOCK_FILE_NAME, 'r') as openfile:
+                data = json.load(openfile)
+            signals = [signal for signal in data if signal != DataStore.c_TIMESTAMP_ID and signal != "units"]
+            data_stores.append(DataStore(name=self.c_MOCK_DATASTORE_NAME, signals=signals, database=""))
         return data_stores
 
     def update_data_stores(self):
@@ -47,28 +46,35 @@ class GUIModel:
 
     def acquire_data(self, data_store: DataStore):
         try:
-            orig_data = ServerRequests().get_data(f'?{data_store.name}')
-            # orig_data["SOLAR"] = SignalShift(Operation.fix_signal(orig_data["SOLAR"])).do_shift(-2.0 if data_store.name == "realtime" else -2.0/6.0)  # TODO dit hoort niet hier
-            data_store.data = {k: v for k, v in orig_data.items() if k != "units" and k in data_store.signals or k == "timestamp"}
-            units = orig_data["units"]
-            UnitStandardizer().execute(units, data_store.data, data_store.signals)
-            data_store.end_timestamp = max(data_store.data["timestamp"])
-            data_store.start_timestamp = min(data_store.data["timestamp"])
+            data = ServerRequests().get_data(data_store)
         except ConnectionError as err:
-            print(f"ConnectionError: {err}")
-            return
+            self.working_connection = False
+            logging.debug(f"ConnectionError: {err}")
+        if self.working_connection is False:
+            with open(self._c_MOCK_FILE_NAME, 'r') as openfile:
+                data = json.load(openfile)
+            logging.debug(f"Got data from file")
+        units = data["units"]
+        data_store.data = {k: Signal(name=k, data=v, unit=units[k] if k in units else "") for k, v in data.items() if k != "units" and k in data_store.signals or k == DataStore.c_TIMESTAMP_ID}
+        UnitStandardizer().execute(units, data_store.data, data_store.signals)
+        data_store.end_timestamp = max(data_store.data[DataStore.c_TIMESTAMP_ID])
+        data_store.start_timestamp = min(data_store.data[DataStore.c_TIMESTAMP_ID])
 
-        t_prev = None
-        for i, t in enumerate(data_store.data['timestamp']):
-            if i != 0:
-                delta_t = t - t_prev
-                if delta_t > {'real_time': 11, 'persistent': 66}[data_store.name]:
-                    print(f"delta = {delta_t} @ t = {datetime.fromtimestamp(t_prev)} > {datetime.fromtimestamp(t)}")
-            t_prev = t
+        try:
+            t_prev = None
+            for i, t in enumerate(data_store.data[DataStore.c_TIMESTAMP_ID]):
+                if i != 0:
+                    delta_t = t - t_prev
+                    if delta_t > {'real_time': 11, 'persistent': 66}[data_store.name]:
+                        print(f"delta = {delta_t} @ t = {datetime.fromtimestamp(t_prev)} > {datetime.fromtimestamp(t)}")
+                t_prev = t
+        except KeyError:
+            pass
 
     def handle_derived_data(self, data_store: DataStore):
         for derivedSignal in Settings().getDerivedSignals(data_store.data):
-            data_store.data[derivedSignal.name] = derivedSignal.get()
+            if derived_data := derivedSignal.get():
+                data_store.data[derivedSignal.name] = derived_data
 
     def get_derived_colors(self):
         return Settings().getDerivedSignalColors()
@@ -87,19 +93,5 @@ class GUIModel:
             start_time = None
         return start_time, end_time
 
-    @staticmethod
-    def b_search(array, value):
-        lo = 0
-        hi = len(array) - 1
-        while lo < hi:
-            m = int((lo + hi) / 2)
-            if array[m] < value:
-                lo = m + 1
-            elif array[m] > value:
-                hi = m - 1
-            elif array[m] == value:
-                return m
-            if hi - lo <= 1:
-                return lo
 
 
