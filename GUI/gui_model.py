@@ -1,7 +1,9 @@
 import logging
+import os
 import json
 from datetime import datetime, timedelta
-from Models.data_store import DataStore, Signal
+from Models.data_store import DataStore, Signal, c_LOCALFILE_ID
+from Models.derived_quantities import DerivedQuantities
 from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
 from Utils.settings import Settings
@@ -10,13 +12,10 @@ from Utils.unit_standardizer import UnitStandardizer
 
 class GUIModel:
 
-    _c_MOCK_FILE_NAME: str = 'sample.json'
-    c_MOCK_DATASTORE_NAME: str = 'localfile'
-
     def __init__(self):
         self.time_range = None
-        self.working_connection = False
         self.data_stores: list[DataStore] = self.init_data_stores()
+        self.current_data_store: DataStore = None
 
     def init_data_stores(self) -> list[DataStore]:
         data_stores = []
@@ -26,34 +25,36 @@ class GUIModel:
                 data_store_info = ServerRequests().get_data_store_info(data_store_id)
                 signals = [signal for signal in data_store_info["Signals"] if Settings().getSignalCheckState(data_store_info["Name"], signal) is True]
                 data_stores.append(DataStore(name=data_store_info["Name"], signals=signals, database=data_store_info["Db"]))
-            self.working_connection = True
         except Exception as err:
             logging.debug(f"Connection error {err}")
-            self.working_connection = False
-            with open(self._c_MOCK_FILE_NAME, 'r') as openfile:
-                data = json.load(openfile)
-            signals = [signal for signal in data if signal != DataStore.c_TIMESTAMP_ID and signal != "units"]
-            data_stores.append(DataStore(name=self.c_MOCK_DATASTORE_NAME, signals=signals, database=""))
         return data_stores
 
     def update_data_stores(self):
         self.data_stores = self.init_data_stores()
+        if self.current_data_store:
+            self.current_data_store = self.get_data_store(self.current_data_store.name)
 
     def get_data_store(self, datastore_name: str) -> DataStore:
         for data_store in self.data_stores:
             if data_store.name == datastore_name:
                 return data_store
 
+    def set_current_datastore(self, data_store: DataStore):
+        self.current_data_store = data_store
+
+    def get_current_data_store(self):
+        return self.current_data_store
+
     def acquire_data(self, data_store: DataStore):
-        try:
-            data = ServerRequests().get_data(data_store)
-        except ConnectionError as err:
-            self.working_connection = False
-            logging.debug(f"ConnectionError: {err}")
-        if self.working_connection is False:
-            with open(self._c_MOCK_FILE_NAME, 'r') as openfile:
-                data = json.load(openfile)
-            logging.debug(f"Got data from file")
+        if data_store.database != c_LOCALFILE_ID:
+            try:
+                data = ServerRequests().get_data(data_store)
+            except ConnectionError as err:
+                logging.debug(f"ConnectionError: {err}")
+                return
+        else:
+            with open(data_store.name, 'r') as openfile:
+                data = DataStore.data_from_stream(json.load(openfile))
         units = data["units"]
         data_store.data = {k: Signal(name=k, data=v, unit=units[k] if k in units else "") for k, v in data.items() if k != "units" and k in data_store.signals or k == DataStore.c_TIMESTAMP_ID}
         UnitStandardizer().execute(units, data_store.data, data_store.signals)
@@ -70,6 +71,17 @@ class GUIModel:
                 t_prev = t
         except KeyError:
             pass
+
+    def init_datastore_from_local_file(self, filename: str):
+        with open(filename, 'r') as openfile:
+            try:
+                data = json.load(openfile)
+            except json.decoder.JSONDecodeError:
+                return None
+            except FileNotFoundError:  # als de naam van de file wordt veranderd tijdens het proces van fileselectie
+                return None
+        data_store = DataStore.unserialize(data, filename)
+        self.data_stores.append(data_store)
 
     def handle_derived_data(self, data_store: DataStore):
         for derivedSignal in Settings().getDerivedSignals(data_store.data):
@@ -93,5 +105,5 @@ class GUIModel:
             start_time = None
         return start_time, end_time
 
-
-
+    def calc_derived_data(self, signals, time_range):
+        return DerivedQuantities(Settings().get_derived_quantities()).get_values(self.current_data_store, signals, time_range)

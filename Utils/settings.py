@@ -61,6 +61,13 @@ class Settings:
         except KeyError:
             return None
 
+    def get_checked_visibilities(self, datastore_name: str):
+        try:
+            return {signal: self.settings["SignalVisibilities"][signal] for signal in self.settings["SignalVisibilities"] if
+                    signal in self.settings["SignalCheckStates"][datastore_name] and self.settings["SignalCheckStates"][datastore_name][signal] is True}
+        except KeyError:
+            return None
+
     def getDerivedSignals(self, data):
         if "DerivedSignals" in self.settings:
             derivedSignals = []
@@ -72,3 +79,7 @@ class Settings:
     def getDerivedSignalColors(self):
         if "DerivedSignals" in self.settings:
             return {name: self.settings["DerivedSignals"][name]["Color"] for name in self.settings["DerivedSignals"]}
+
+    def get_derived_quantities(self) -> dict[str, list]:
+        if "DerivedQuantities" in self.settings:
+            return {quantity: self.settings["DerivedQuantities"][quantity] for quantity in self.settings["DerivedQuantities"]}

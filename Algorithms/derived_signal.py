@@ -13,34 +13,6 @@ class DerivedSignal:
         if all((operand in self.data for operand in op.all_operands())) is True:
             return op.exec()
 
-    @staticmethod
-    def fix_signal(signal: Signal) -> Signal:
-        fixed = Signal(name=signal.name, data=len(signal) * [0.0], unit=signal.unit)
-        for i, value in enumerate(signal):
-            if value:
-                fixed[i] = value
-            else:
-                if 0 < i < len(signal) - 1:
-                    if signal[i - 1] is not None and signal[i + 1] is not None:
-                        fixed[i] = (signal[i - 1] + signal[i + 1]) / 2.0
-                    elif signal[i - 1] is not None:
-                        fixed[i] = signal[i - 1]
-                    elif signal[i + 1] is not None:
-                        fixed[i] = signal[i + 1]
-                    else:
-                        fixed[i] = 0.0
-                else:
-                    if i > 0:
-                        if signal[len(signal) - 1] is None:
-                            fixed[i] = 0.0
-                        else:
-                            fixed[i] = signal[len(signal) - 1]
-                    else:
-                        if signal[0] is None:
-                            fixed[i] = 0.0
-                        else:
-                            fixed[i] = signal[0]
-        return fixed
 
 
 class Operation:
@@ -48,7 +20,7 @@ class Operation:
     Holder for binary operation such as '+', '-'
     """
 
-    def __init__(self, operator, operand1, operand2, data):
+    def __init__(self, operator, operand1, operand2, data: dict[str, Signal]):
         self.operator = operator
         self.operand1 = operand1
         self.operand2 = operand2
@@ -64,8 +36,8 @@ class Operation:
             result = self.operand1.exec()
         else:
             result = self.data[self.operand1]
-        result = DerivedSignal.fix_signal(result)
-        signal2 = DerivedSignal.fix_signal(self.data[self.operand2])
+        result = result.fix_signal()
+        signal2 = self.data[self.operand2].fix_signal()
         if self.operator == '+':
             return Signal(name="sum", data=[result[i] + signal2[i] for i in range(len(result))], unit=result.unit)
         elif self.operator == '-':
@@ -84,7 +56,7 @@ class Formula:
     Converts into a possibly stacked operation.
     """
 
-    def __init__(self, formula_text: str, data):
+    def __init__(self, formula_text: str, data: dict[str, Signal]):
         self.formula_text = formula_text
         self.data = data
         self.num = 0  # iterator
@@ -101,7 +73,7 @@ class Formula:
         except StopIteration:
             return op
 
-    def words(self):
+    def words(self) -> list[str]:
         return self.formula_text.split()
 
     def __iter__(self):

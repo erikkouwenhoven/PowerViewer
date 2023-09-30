@@ -39,6 +39,9 @@ class Config:
     def getLoggingPath(self):
         return self.config.get('PATHS', 'logging')
 
+    def getDataFilesPath(self):
+        return self.config.get('PATHS', 'datafiles')
+
     def getLoggingFilename(self):
         return self.config.get('FILES', 'logfile')
 

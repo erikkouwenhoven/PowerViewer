@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 from typing import ClassVar
+from Algorithms.binary_search import b_search
+
+
+c_LOCALFILE_ID = "Local_file"
 
 
 @dataclass
@@ -8,6 +12,34 @@ class Signal:
     data: list[float]
     unit: str
     num: int = -1  # iterator
+
+    def fix_signal(self):
+        fixed = Signal(name=self.name, data=len(self) * [0.0], unit=self.unit)
+        for i, value in enumerate(self):
+            if value:
+                fixed[i] = value
+            else:
+                if 0 < i < len(self) - 1:
+                    if self[i - 1] is not None and self[i + 1] is not None:
+                        fixed[i] = (self[i - 1] + self[i + 1]) / 2.0
+                    elif self[i - 1] is not None:
+                        fixed[i] = self[i - 1]
+                    elif self[i + 1] is not None:
+                        fixed[i] = self[i + 1]
+                    else:
+                        fixed[i] = 0.0
+                else:
+                    if i > 0:
+                        if self[len(self) - 1] is None:
+                            fixed[i] = 0.0
+                        else:
+                            fixed[i] = self[len(self) - 1]
+                    else:
+                        if self[0] is None:
+                            fixed[i] = 0.0
+                        else:
+                            fixed[i] = self[0]
+        return fixed
 
     def __iter__(self):
         return self
@@ -35,6 +67,17 @@ class Signal:
     def max(self):
         return max(self.data)
 
+    def serialize(self, idx_range=None):
+        return {
+            "name": self.name,
+            "data": self.data if idx_range is None else [self.data[i] for i in range(idx_range[0], idx_range[1])],
+            "unit": self.unit
+        }
+
+    @classmethod
+    def unserialize(cls, stream: dict):
+        return cls(name=stream["name"], data=stream["data"], unit=stream["unit"])
+
     def __str__(self):
         return f"{self.name}: {self.data}"
 
@@ -45,7 +88,7 @@ class DataStore:
     c_TIMESTAMP_ID: ClassVar[str] = "timestamp"
 
     name: str
-    database: str
+    database: str  # Bij local file wordt dit c_LOCALFILE_ID
     signals: list[str]
     derived_signals: list[str] = None
     data: dict[str, Signal] = None
@@ -71,3 +114,36 @@ class DataStore:
         if len(units) > 0:
             if all(unit == units[0] for unit in units) is True:
                 return units[0]
+
+    def serialize(self, signals, time_range):
+        if time_range is not None:
+            i_range = (b_search(self.data[DataStore.c_TIMESTAMP_ID].data, time_range[0]),
+                       b_search(self.data[DataStore.c_TIMESTAMP_ID].data, time_range[1]))
+            data = [self.data[signal].serialize(i_range) for signal in self.data if signals is None or signal in signals or signal == DataStore.c_TIMESTAMP_ID]
+        else:
+            data = [self.data[signal].serialize() for signal in self.data]
+        return {
+            "name": self.name,
+            "database": c_LOCALFILE_ID,
+            "signals": [signal for signal in self.signals if signals is None or signal in signals],
+            "data": data
+        }
+
+    @staticmethod
+    def data_from_stream(stream: dict):
+        """
+        converteer naar lijst van signals
+        creeer lijstje van units
+        geef dict van floats terug
+        """
+        # data = {elem["name"]: Signal.unserialize(elem) for elem in stream["data"]}
+        data = {}
+        signals = [Signal.unserialize(elem) for elem in stream["data"]]
+        data["units"] = {signal.name: signal.unit for signal in signals}
+        for signal in signals:
+            data[signal.name] = signal.data
+        return data
+
+    @classmethod
+    def unserialize(cls, stream: dict, name: str):
+        return cls(name=name, database=c_LOCALFILE_ID, signals=stream["signals"])
