@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 import os
 import json
 from datetime import datetime, timedelta
@@ -10,12 +11,12 @@ from Utils.settings import Settings
 from Utils.unit_standardizer import UnitStandardizer
 
 
-class GUIModel:
+class Model:
 
     def __init__(self):
         self.time_range = None
         self.data_stores: list[DataStore] = self.init_data_stores()
-        self.current_data_store: DataStore = None
+        self.current_data_store: Optional[DataStore] = None
 
     def init_data_stores(self) -> list[DataStore]:
         data_stores = []
@@ -42,7 +43,7 @@ class GUIModel:
     def set_current_datastore(self, data_store: DataStore):
         self.current_data_store = data_store
 
-    def get_current_data_store(self):
+    def get_current_data_store(self) -> DataStore:
         return self.current_data_store
 
     def acquire_data(self, data_store: DataStore):
@@ -73,28 +74,35 @@ class GUIModel:
             pass
 
     def init_datastore_from_local_file(self, filename: str):
-        with open(filename, 'r') as openfile:
-            try:
-                data = json.load(openfile)
-            except json.decoder.JSONDecodeError:
-                return None
-            except FileNotFoundError:  # als de naam van de file wordt veranderd tijdens het proces van fileselectie
-                return None
+        try:
+            with open(filename, 'r') as openfile:
+                try:
+                    data = json.load(openfile)
+                except json.decoder.JSONDecodeError:
+                    return None
+        except FileNotFoundError:  # als de naam van de file wordt veranderd tijdens het proces van fileselectie
+            return None
         data_store = DataStore.unserialize(data, filename)
         self.data_stores.append(data_store)
-
-    def handle_derived_data(self, data_store: DataStore):
-        for derivedSignal in Settings().getDerivedSignals(data_store.data):
-            if derived_data := derivedSignal.get():
-                data_store.data[derivedSignal.name] = derived_data
-
-    def get_derived_colors(self):
-        return Settings().getDerivedSignalColors()
 
     def get_time_range(self):
         return self.time_range
 
-    def get_default_time_range(self, datastore: DataStore):
+    def calc_derived_data(self, signals, time_range):
+        return DerivedQuantities(Settings().get_derived_quantities()).get_values(self.current_data_store, signals, time_range)
+
+    @staticmethod
+    def handle_derived_data(data_store: DataStore):
+        for derivedSignal in Settings().getDerivedSignals(data_store.data):
+            if derived_data := derivedSignal.get():
+                data_store.data[derivedSignal.name] = derived_data
+
+    @staticmethod
+    def get_derived_colors():
+        return Settings().getDerivedSignalColors()
+
+    @staticmethod
+    def get_default_time_range(datastore: DataStore):
         end_time = datastore.end_timestamp
         min_time = datastore.start_timestamp
         if end_time:
@@ -105,5 +113,3 @@ class GUIModel:
             start_time = None
         return start_time, end_time
 
-    def calc_derived_data(self, signals, time_range):
-        return DerivedQuantities(Settings().get_derived_quantities()).get_values(self.current_data_store, signals, time_range)

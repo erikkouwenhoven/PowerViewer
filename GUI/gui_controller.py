@@ -5,9 +5,9 @@ from datetime import datetime
 from Utils.settings import Settings
 from Utils.config import Config
 from GUI.gui_view import GUIView
-from GUI.gui_model import GUIModel
+from Models.model import Model
 from GUI.Tools.time_format import filename_fmt
-from Models.data_store import DataStore, c_LOCALFILE_ID
+from Models.data_store import c_LOCALFILE_ID
 from Algorithms.signal_shift import SignalShift
 from GUI.time_delay_controller import TimeDelayController
 
@@ -17,7 +17,7 @@ class GUIController:
 
     def __init__(self):
         self.view = GUIView()
-        self.model = GUIModel()
+        self.model = Model()
         self.view.connectEvents(
             {
                 'settingsDeactivated': self.deactivateSettings,
@@ -97,7 +97,7 @@ class GUIController:
             print(shift_in_samples)
 
     def reload(self):
-        self.acquire_and_show()
+        self.apply_data_store(self.model.get_current_data_store().name)
 
     def save_data(self, signals: list[str] = None, time_range: tuple[float] = None):
         datastore = self.model.get_current_data_store()
@@ -112,13 +112,13 @@ class GUIController:
                 filename += f"_{cnt}"
             else:
                 filename = filename.split('_')[0] + f"_{cnt}"
-        datastore.name = full_file_name
+        # datastore.name = full_file_name
         with open(full_file_name, "w") as openfile:
             json.dump(datastore.serialize(signals, time_range), openfile)
 
     def acquire_and_show(self):
         datastore = self.model.get_current_data_store()
         self.model.acquire_data(datastore)
-        self.model.handle_derived_data(datastore)
-        self.view.append_colors(self.model.get_derived_colors())
-        self.view.show_data(self.model.get_default_time_range(datastore), datastore)
+        Model.handle_derived_data(datastore)
+        self.view.append_colors(Model.get_derived_colors())
+        self.view.show_data(Model.get_default_time_range(datastore), datastore)

@@ -88,6 +88,9 @@ class Config:
     def getPanPlotRelativePosition(self):
         return float(self.config.get('PLOTTING', 'pan_plot_relative_position'))
 
+    def getBarPlotSignals(self):
+        return self.config.get('PLOTTING', 'bar_plot').split()
+
     def get_colors(self) -> dict[str, str]:
         colors = {}
         for name in self.config['PLOTTING']:

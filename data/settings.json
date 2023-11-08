@@ -1,17 +1,6 @@
 {
     "SignalCheckStates": {
         "real_time": {
-            "CURRENT_USAGE": false,
-            "CURRENT_PRODUCTION": true,
-            "SOLAR": true,
-            "CURRENT_USAGE_PHASE1": true,
-            "CURRENT_USAGE_PHASE2": true,
-            "CURRENT_USAGE_PHASE3": true,
-            "CURRENT_PRODUCTION_PHASE1": false,
-            "CURRENT_PRODUCTION_PHASE2": false,
-            "CURRENT_PRODUCTION_PHASE3": true
-        },
-        "persistent": {
             "CURRENT_USAGE": true,
             "CURRENT_PRODUCTION": true,
             "SOLAR": true,
@@ -20,7 +9,28 @@
             "CURRENT_USAGE_PHASE3": true,
             "CURRENT_PRODUCTION_PHASE1": false,
             "CURRENT_PRODUCTION_PHASE2": false,
-            "CURRENT_PRODUCTION_PHASE3": true
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "USAGE_GAS": true,
+            "CUMULATIVE_GAS": true
+        },
+        "persistent": {
+            "CURRENT_USAGE": true,
+            "CURRENT_PRODUCTION": true,
+            "SOLAR": true,
+            "CURRENT_USAGE_PHASE1": true,
+            "CURRENT_USAGE_PHASE2": true,
+            "CURRENT_USAGE_PHASE3": true,
+            "CURRENT_PRODUCTION_PHASE1": true,
+            "CURRENT_PRODUCTION_PHASE2": true,
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "USAGE_GAS": true,
+            "CUMULATIVE_GAS": true
+        },
+        "gas_hourly": {
+            "USAGE_GAS": true
+        },
+        "gas_cum_temp": {
+            "CUMULATIVE_GAS": true
         }
     },
     "DerivedSignals": {
@@ -38,7 +48,7 @@
         ]
     },
     "SignalVisibilities": {
-        "CURRENT_USAGE": false,
+        "CURRENT_USAGE": true,
         "CURRENT_PRODUCTION": false,
         "SOLAR": true,
         "CURRENT_USAGE_PHASE1": true,
@@ -47,6 +57,8 @@
         "CURRENT_PRODUCTION_PHASE1": false,
         "CURRENT_PRODUCTION_PHASE2": false,
         "CURRENT_PRODUCTION_PHASE3": true,
-        "Verbruik": true
+        "Verbruik": false,
+        "USAGE_GAS": true,
+        "CUMULATIVE_GAS": true
     }
 }

@@ -109,11 +109,13 @@ class DataStore:
     def signals_comma_separated(self) -> str:
         return ",".join(self.signals)
 
-    def get_dominant_unit(self):
-        units = [self.data[signal].unit for signal in self.data if signal != self.c_TIMESTAMP_ID]
-        if len(units) > 0:
-            if all(unit == units[0] for unit in units) is True:
-                return units[0]
+    def get_signals_grouped_unit(self) -> dict[str, list[Signal]]:
+        result = {}
+        units = {self.data[signal].unit for signal in self.data if signal != self.c_TIMESTAMP_ID}
+        for unit in units:
+            signals = [signal for signal in self.data.values() if signal.unit == unit]
+            result[unit] = signals
+        return result
 
     def serialize(self, signals, time_range):
         if time_range is not None:

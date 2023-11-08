@@ -6,7 +6,12 @@ class UnitStandardizer:
     """
     """
 
-    c_UNITS = ({'W': 1, 'kW': 1000}, {'Wh': 1, 'kWh': 1000})
+    c_UNITS = {
+        'Power': {'W': 1, 'kW': 1000},
+        'Energy': {'Wh': 1, 'kWh': 1000},
+        'Volume': {'m3': 1},
+        'Usage': {'m3/h': 1}
+    }
 
     def __init__(self):
         pass
@@ -24,7 +29,7 @@ class UnitStandardizer:
             return unit not in Config().getPreferredUnits()
 
     def is_defined_unit(self, unit):
-        for unit_type in self.c_UNITS:
+        for unit_type in self.c_UNITS.values():
             for defined_unit in unit_type:
                 if unit == defined_unit:
                     return True
@@ -36,9 +41,16 @@ class UnitStandardizer:
         signal.data = [item * conv_fac if item is not None else 0.0 for item in signal]
 
     def get_conversion_factor(self, unit):
-        for unit_type in self.c_UNITS:
+        for unit_type in self.c_UNITS.values():
             for defined_unit in unit_type:
                 if unit == defined_unit:
                     for pref_unit in Config().getPreferredUnits():
                         if pref_unit in unit_type:
                             return unit_type[unit] / unit_type[pref_unit], pref_unit
+                    return 1.0, unit  # Not in the preferred unit list, but a defined unit
+
+    def get_quantity(self, unit: str) -> str:
+        for quantity in self.c_UNITS:
+            for defined_unit in self.c_UNITS[quantity]:
+                if unit == defined_unit:
+                    return quantity

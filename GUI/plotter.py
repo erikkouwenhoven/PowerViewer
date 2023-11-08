@@ -8,6 +8,7 @@ from Utils.config import Config
 from GUI.Tools.time_format import plot_axis_fmt
 from Models.data_store import DataStore
 from Algorithms.binary_search import b_search
+from Utils.unit_standardizer import UnitStandardizer
 
 
 class Plotter:
@@ -24,6 +25,7 @@ class Plotter:
         self.span_rect = [None, None]
         self.aspan = None
         self.cursor = None
+        self.twin_axes = None
         self.connect_mpl_events()
 
     def connect_mpl_events(self):
@@ -46,25 +48,46 @@ class Plotter:
         lines = []  # the line plots
         self.mpl_widget.canvas.ax.clear()
         self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.DateFormatter(plot_axis_fmt))
-        self.mpl_widget.canvas.ax.set_xlabel('time [.]')
-        unit = self.data_store.get_dominant_unit()
-        self.mpl_widget.canvas.ax.set_ylabel(f"Power [{list(unit)[0]}]")
-        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(
-            mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
+        self.mpl_widget.canvas.ax.set_xlabel('time')
+        units = self.data_store.get_signals_grouped_unit()
+        axes_signals = {}
+        if self.twin_axes and len(units) <= 1:
+            self.twin_axes.remove()
+            self.twin_axes = None
+        for i_unit, unit in enumerate(units):
+            if i_unit == 0:
+                if self.twin_axes:
+                    self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                self.mpl_widget.canvas.ax.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
+
+                axes_signals = {signal.name: self.mpl_widget.canvas.ax for signal in units[unit]}
+            elif i_unit == 1:
+                if self.twin_axes is None:
+                    self.twin_axes = self.mpl_widget.canvas.ax.twinx()
+                else:
+                    self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                self.twin_axes.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
+                axes_signals = axes_signals | {signal.name: self.twin_axes for signal in units[unit]}
+            else:
+                raise RuntimeError("Niet meer dan 2 assen mogelijk")
+        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
         if self.data_store:
             signals = [item for item in self.data_store.data if item != DataStore.c_TIMESTAMP_ID]
             i_range = range(b_search(self.data_store.data[DataStore.c_TIMESTAMP_ID], self.time_range[0]),
-                            b_search(self.data_store.data[DataStore.c_TIMESTAMP_ID], self.time_range[1]))
+                            b_search(self.data_store.data[DataStore.c_TIMESTAMP_ID], self.time_range[1]) + 1)
             time_data = [datetime.fromtimestamp(self.data_store.data[DataStore.c_TIMESTAMP_ID][idx]) for idx in i_range]
             for signal in signals:
                 try:
-                    line_plot, = self.mpl_widget.canvas.ax.plot(time_data,
-                                                                [self.data_store.data[signal][idx] for idx in i_range],
-                                                                color=self.colors[signal], label=signal)
-                    lines.append(line_plot)
+                    ax = axes_signals[signal] if signal in axes_signals else self.mpl_widget.canvas.ax  # de else heeft betrekking op derived signals
+                    signal_data = [self.data_store.data[signal][idx] for idx in i_range]
+                    if signal in Config().getBarPlotSignals():
+                        ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
+                    else:
+                        line_plot, = ax.plot(time_data, signal_data, color=self.colors[signal], label=signal)
+                        lines.append(line_plot)
                 except KeyError:
                     print(f"Error {signal}")
-            leg = self.mpl_widget.canvas.ax.legend()
+            leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes.legend(handles=lines)
             self.lines = {}  # Will map legend lines to original lines.
             for legend_text, origline in zip(leg.get_texts(), lines):
                 legend_text.set_picker(4)  # Enable picking on the legend line.
@@ -78,33 +101,32 @@ class Plotter:
                     visibility = True
                     self.signal_visibilities[legend_text.get_text()] = visibility
                 self.switch_visible(legend_text, visibility)
+        if self.twin_axes:
+            self.twin_axes.autoscale()
+            print("autoscale")
         if self.cursor:
             self.cursor.remove()
         self.cursor = mplcursors.cursor(lines, multiple=False)
-        # self.cursor.connect("add", self.on_add_cursor)
         self.mpl_widget.canvas.draw()
         if self.redraw_notifier:
             self.redraw_notifier()
 
-    def on_add_cursor(self, selection):
-        print(f"er zijn er {len(self.cursor.selections)}")
-        # for sel in self.cursor.selections:
-        #     if sel != selection:
-        #         self.cursor.remove_selection(sel)
-
     def on_pick_legend_text(self, event):
         # On the pick event, find the original line corresponding to the legend
         # proxy line, and toggle its visibility.
-        legend_text = event.artist
         try:
-            origline = self.lines[legend_text]
-            self.switch_visible(legend_text, not origline.get_visible())
-            self.mpl_widget.canvas.draw()
-        except KeyError:  # the mplcursor is a legend too
-            pass
+            legend_text = event.artist
+            try:
+                origline = self.lines[legend_text]
+                self.switch_visible(legend_text, not origline.get_visible())
+                self.mpl_widget.canvas.draw()
+            except KeyError:  # the mplcursor is a legend too
+                pass
+        except AttributeError:
+            pass  # no artist
 
     def on_mouse_event(self, event):
-        if legend := self.mpl_widget.canvas.ax.get_legend():
+        if legend := (self.twin_axes.get_legend() if self.twin_axes else self.mpl_widget.canvas.ax.get_legend()):
             if not legend.get_window_extent().contains(event.x, event.y):
                 if event.name == 'button_press_event' and event.button == mpl.backend_bases.MouseButton.LEFT:
                     x_range = self.mpl_widget.canvas.ax.dataLim.xmax - self.mpl_widget.canvas.ax.dataLim.xmin
