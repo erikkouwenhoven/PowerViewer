@@ -1,4 +1,4 @@
-from Models.data_store import Signal
+from Models.signal import Signal
 
 
 class DerivedSignal:
@@ -10,7 +10,7 @@ class DerivedSignal:
 
     def get(self) -> Signal:
         op = self.formula.evaluate()
-        if all((operand in self.data for operand in op.all_operands())) is True:
+        if self.data and all((operand in self.data for operand in op.all_operands())) is True:
             return op.exec()
 
 

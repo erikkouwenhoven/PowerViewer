@@ -1,85 +1,12 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
-from Algorithms.binary_search import b_search
+from Models.signal import Signal
+from Algorithms.binary_search import interval_to_range
+from Utils.unit_standardizer import UnitStandardizer
 
 
 c_LOCALFILE_ID = "Local_file"
-
-
-@dataclass
-class Signal:
-    name: str
-    data: list[float]
-    unit: str
-    num: int = -1  # iterator
-
-    def fix_signal(self):
-        fixed = Signal(name=self.name, data=len(self) * [0.0], unit=self.unit)
-        for i, value in enumerate(self):
-            if value:
-                fixed[i] = value
-            else:
-                if 0 < i < len(self) - 1:
-                    if self[i - 1] is not None and self[i + 1] is not None:
-                        fixed[i] = (self[i - 1] + self[i + 1]) / 2.0
-                    elif self[i - 1] is not None:
-                        fixed[i] = self[i - 1]
-                    elif self[i + 1] is not None:
-                        fixed[i] = self[i + 1]
-                    else:
-                        fixed[i] = 0.0
-                else:
-                    if i > 0:
-                        if self[len(self) - 1] is None:
-                            fixed[i] = 0.0
-                        else:
-                            fixed[i] = self[len(self) - 1]
-                    else:
-                        if self[0] is None:
-                            fixed[i] = 0.0
-                        else:
-                            fixed[i] = self[0]
-        return fixed
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self.num + 1 >= len(self.data):
-            self.num = -1
-            raise StopIteration
-        else:
-            self.num += 1
-            return self.data[self.num]
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, item):
-        return self.data[item]
-
-    def __setitem__(self, key, value):
-        self.data[key] = value
-
-    def min(self):
-        return min(self.data)
-
-    def max(self):
-        return max(self.data)
-
-    def serialize(self, idx_range=None):
-        return {
-            "name": self.name,
-            "data": self.data if idx_range is None else [self.data[i] for i in range(idx_range[0], idx_range[1])],
-            "unit": self.unit
-        }
-
-    @classmethod
-    def unserialize(cls, stream: dict):
-        return cls(name=stream["name"], data=stream["data"], unit=stream["unit"])
-
-    def __str__(self):
-        return f"{self.name}: {self.data}"
 
 
 @dataclass
@@ -89,11 +16,23 @@ class DataStore:
 
     name: str
     database: str  # Bij local file wordt dit c_LOCALFILE_ID
-    signals: list[str]
+    signals: list[str] = None
     derived_signals: list[str] = None
     data: dict[str, Signal] = None
     start_timestamp: float = None
     end_timestamp: float = None
+
+    def set_data(self, data: dict[str, list[float] | list[str]]):
+        if data:
+            self.signals = [signal for signal in data if signal != "units" and signal != DataStore.c_TIMESTAMP_ID]
+            units = data["units"]
+            self.data = {k: Signal(name=k, data=v, unit=units[k] if k in units else "") for k, v in data.items() if k != "units" and k in self.signals or k == DataStore.c_TIMESTAMP_ID}
+            UnitStandardizer().execute(units, self.data, self.signals)
+            try:
+                self.end_timestamp = max(self.data[DataStore.c_TIMESTAMP_ID])
+                self.start_timestamp = min(self.data[DataStore.c_TIMESTAMP_ID])
+            except ValueError:
+                pass  # geen data
 
     def get_sampling_time(self):
         cum_delta = 0.0
@@ -110,38 +49,46 @@ class DataStore:
         return ",".join(self.signals)
 
     def get_signals_grouped_unit(self) -> dict[str, list[Signal]]:
-        result = {}
-        units = {self.data[signal].unit for signal in self.data if signal != self.c_TIMESTAMP_ID}
-        for unit in units:
-            signals = [signal for signal in self.data.values() if signal.unit == unit]
-            result[unit] = signals
-        return result
+        if self.data:
+            result = {}
+            units = {self.data[signal].unit for signal in self.data if signal != self.c_TIMESTAMP_ID}
+            for unit in units:
+                signals = [signal for signal in self.data.values() if signal.unit == unit]
+                result[unit] = signals
+            return result
 
-    def serialize(self, signals, time_range):
+    def combine_signals_grouped_units(self, group: dict[str, list[Signal]]) -> dict[str, list[Signal]]:
+        new_group = self.get_signals_grouped_unit()
+        if group:
+            for unit in group:
+                if unit in new_group:
+                    new_group[unit] += group[unit]
+                else:
+                    new_group[unit] = group[unit]
+        return new_group
+
+    def serialize(self, signals, time_range, name=None):
         if time_range is not None:
-            i_range = (b_search(self.data[DataStore.c_TIMESTAMP_ID].data, time_range[0]),
-                       b_search(self.data[DataStore.c_TIMESTAMP_ID].data, time_range[1]))
+            i_range = interval_to_range(self.data[DataStore.c_TIMESTAMP_ID].data, time_range[0], time_range[1])
             data = [self.data[signal].serialize(i_range) for signal in self.data if signals is None or signal in signals or signal == DataStore.c_TIMESTAMP_ID]
         else:
             data = [self.data[signal].serialize() for signal in self.data]
         return {
-            "name": self.name,
+            "name": self.name if name is None else name,
             "database": c_LOCALFILE_ID,
             "signals": [signal for signal in self.signals if signals is None or signal in signals],
             "data": data
         }
 
     @staticmethod
-    def data_from_stream(stream: dict):
+    def data_from_stream(stream: dict, data_store: DataStore) -> dict[str, list[float] | list[str]]:
         """
         converteer naar lijst van signals
         creeer lijstje van units
         geef dict van floats terug
         """
-        # data = {elem["name"]: Signal.unserialize(elem) for elem in stream["data"]}
-        data = {}
         signals = [Signal.unserialize(elem) for elem in stream["data"]]
-        data["units"] = {signal.name: signal.unit for signal in signals}
+        data = {"units": {signal.name: signal.unit for signal in signals}}
         for signal in signals:
             data[signal.name] = signal.data
         return data
@@ -149,3 +96,6 @@ class DataStore:
     @classmethod
     def unserialize(cls, stream: dict, name: str):
         return cls(name=name, database=c_LOCALFILE_ID, signals=stream["signals"])
+
+    def __hash__(self):
+        return hash(self.name)

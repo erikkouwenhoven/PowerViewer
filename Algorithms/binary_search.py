@@ -1,3 +1,5 @@
+from enum import Enum, auto
+
 """
 Binary search algorithm
 
@@ -6,7 +8,14 @@ The array should be in increasing order.
 """
 
 
-def b_search(array: list[float], value: float) -> int:
+class Rounding(Enum):
+
+    UP = auto()
+    DOWN = auto()
+    NEAR = auto()
+
+
+def b_search(array: list[float], value: float, rounding: Rounding = Rounding.NEAR) -> int:
     lo = 0
     hi = len(array) - 1
     while lo < hi:
@@ -18,7 +27,17 @@ def b_search(array: list[float], value: float) -> int:
         elif array[m] == value:
             return m
         if hi - lo <= 1:
-            return lo if value - array[lo] < array[hi] - value else hi
+            if rounding is Rounding.NEAR:
+                return lo if value - array[lo] < array[hi] - value else hi
+            elif rounding is Rounding.UP:
+                return hi
+            elif rounding is Rounding.DOWN:
+                return lo
+
+def interval_to_range(data: list[float], low_value: float, hi_value: float) -> range:
+    lo = b_search(data, low_value, Rounding.DOWN)
+    hi = b_search(data, hi_value, Rounding.UP)
+    return range(lo, hi)
 
 
 if __name__ == "__main__":

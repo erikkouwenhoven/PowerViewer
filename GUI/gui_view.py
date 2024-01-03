@@ -8,6 +8,7 @@ from Utils.config import Config
 from Utils.settings import Settings
 from GUI.plotter import Plotter
 from Models.data_store import DataStore
+from Models.data_view import DataView
 from Models.data_store import c_LOCALFILE_ID
 
 
@@ -34,6 +35,10 @@ class GUIView(QMainWindow):
         # context menus
         self.ui.mpl_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.ui.mpl_widget.customContextMenuRequested.connect(self.showContextMenu)
+        # init data sources
+        self.ui.datasourceComboBox.blockSignals(True)
+        self.ui.datasourceComboBox.addItem(self.c_LOCALFILE_LABEL)
+        self.ui.datasourceComboBox.blockSignals(False)
 
     def connectEvents(self, commandDict):
         for key, value in commandDict.items():
@@ -60,7 +65,7 @@ class GUIView(QMainWindow):
 
     def showContextMenu(self, position):
         menu = QMenu()
-        settingsAction = menu.addAction("Settings")
+        settingsAction = menu.addAction("Control panel")
         solarDelayAction = menu.addAction("Solar delay")
         reloadAction = menu.addAction("Reload")
         saveSubMenu = QMenu("Save")
@@ -95,15 +100,16 @@ class GUIView(QMainWindow):
     def get_visibilities(self) -> dict[str, bool]:
         return self.plotter.signal_visibilities
 
-    def show_data(self, time_range, data_store: DataStore):
+    def show_data(self, time_range, data_view: DataView):
         self.plotter.time_range = time_range
-        self.plotter.data_store = data_store
-        self.plotter.set_signal_visibiities(Settings().get_checked_visibilities(data_store.name))
+        self.plotter.data_view = data_view
+        for data_store in data_view.get_data_stores():
+            self.plotter.set_signal_visibiities(Settings().get_checked_visibilities(data_store.name))
         self.plotter.update_plot()
 
-    def show_data_stores(self, data_stores: list[DataStore]):
+    def show_data_views(self, data_views: dict[str, DataView]):
         self.ui.datasourceComboBox.blockSignals(True)
-        self.ui.datasourceComboBox.addItems([self.c_LOCALFILE_LABEL] + [data_store.name for data_store in data_stores])
+        self.ui.datasourceComboBox.addItems([data_view for data_view in data_views])
         self.ui.datasourceComboBox.blockSignals(False)
 
     def get_data_store_name(self) -> str:
@@ -128,10 +134,10 @@ class GUIView(QMainWindow):
             self.ui.signalsTableWidget.setItem(row, 0, item)
         self.ui.signalsTableWidget.blockSignals(False)
 
-    def set_date_range(self, data_store: DataStore):
-        if data_store.end_timestamp and data_store.start_timestamp:
-            max_time = datetime.fromtimestamp(data_store.end_timestamp)
-            min_time = datetime.fromtimestamp(data_store.start_timestamp)
+    def set_date_range(self, data_stores: list[DataStore]):
+        if all([data_store.end_timestamp is not None for data_store in data_stores]) and all([data_store.start_timestamp is not None for data_store in data_stores]):
+            max_time = min([datetime.fromtimestamp(data_store.end_timestamp) for data_store in data_stores])
+            min_time = max([datetime.fromtimestamp(data_store.start_timestamp) for data_store in data_stores])
             self.ui.fromDateTimeLabel.setText(min_time.strftime(data_range_fmt))
             self.ui.toDateTimeLabel.setText(max_time.strftime(data_range_fmt))
 

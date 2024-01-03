@@ -22,7 +22,10 @@ class ServerRequests:
             logging.debug(f"Could not receive data, error: {e}")
             return None
         logging.debug(f"Number of samples received: {len(data[DataStore.c_TIMESTAMP_ID])}")
-        logging.debug(f"Time range: from {datetime.fromtimestamp(data[DataStore.c_TIMESTAMP_ID][0])} to {datetime.fromtimestamp(data[DataStore.c_TIMESTAMP_ID][-1])}")
+        try:
+            logging.debug(f"Time range: from {datetime.fromtimestamp(data[DataStore.c_TIMESTAMP_ID][0])} to {datetime.fromtimestamp(data[DataStore.c_TIMESTAMP_ID][-1])}")
+        except IndexError:
+            logging.debug(f"Not possible to obtain time range limits")
         return data
 
     def get_data_stores(self) -> list[str]:

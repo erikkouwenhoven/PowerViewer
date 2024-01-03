@@ -1,6 +1,6 @@
 import math
 from Utils.config import Config
-from Models.data_store import Signal
+from Models.signal import Signal
 from Algorithms.golden_section_search import gssrec
 
 

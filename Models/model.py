@@ -1,22 +1,27 @@
 import logging
 from typing import Optional
-import os
 import json
 from datetime import datetime, timedelta
-from Models.data_store import DataStore, Signal, c_LOCALFILE_ID
+from Models.data_store import DataStore, c_LOCALFILE_ID
+from Models.data_view import DataView
 from Models.derived_quantities import DerivedQuantities
 from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
 from Utils.settings import Settings
-from Utils.unit_standardizer import UnitStandardizer
+from Utils.config import Config
 
 
 class Model:
+    """
+    Eigenaar van de data_views en de data_stores. De data_views houden referenties bij van de data_stores. Bij
+    initialisatie zijn de data_stores nog niet gevuld met data.
+    """
 
     def __init__(self):
         self.time_range = None
         self.data_stores: list[DataStore] = self.init_data_stores()
-        self.current_data_store: Optional[DataStore] = None
+        self.data_views: dict[str, DataView] = self.init_data_views()
+        self.current_data_view_name: Optional[str] = None
 
     def init_data_stores(self) -> list[DataStore]:
         data_stores = []
@@ -30,66 +35,75 @@ class Model:
             logging.debug(f"Connection error {err}")
         return data_stores
 
+    def init_data_views(self) -> Optional[dict[str, DataView]]:
+        if all_data_stores := self.data_stores:
+            data_views = Settings().get_data_views(all_data_stores)
+            for data_store in self.data_stores:
+                data_views[data_store.name] = DataView.from_data_store(data_store, self.data_stores)
+            return data_views
+        else:
+            return {}
+
     def update_data_stores(self):
         self.data_stores = self.init_data_stores()
-        if self.current_data_store:
-            self.current_data_store = self.get_data_store(self.current_data_store.name)
 
     def get_data_store(self, datastore_name: str) -> DataStore:
         for data_store in self.data_stores:
             if data_store.name == datastore_name:
                 return data_store
 
-    def set_current_datastore(self, data_store: DataStore):
-        self.current_data_store = data_store
+    def handle_new_data_stores(self, new_data_stores: list[DataStore]):
+        for data_store in new_data_stores:
+            if existing := self.get_data_store(data_store.name):
+                self.data_stores.remove(existing)
+            self.data_stores.append(data_store)
 
-    def get_current_data_store(self) -> DataStore:
-        return self.current_data_store
+    def get_data_view(self, dataview_name: str) -> DataView:
+        if dataview_name in self.data_views:
+            return self.data_views[dataview_name]
 
-    def acquire_data(self, data_store: DataStore):
-        if data_store.database != c_LOCALFILE_ID:
-            try:
-                data = ServerRequests().get_data(data_store)
-            except ConnectionError as err:
-                logging.debug(f"ConnectionError: {err}")
-                return
+    def set_current_data_view(self, data_view_name: str):
+        assert data_view_name in self.data_views
+        self.current_data_view_name = data_view_name
+
+    def get_current_data_view(self) -> DataView:
+        return self.data_views[self.current_data_view_name]
+
+    def get_local_file_name(self, data_view: DataView) -> str:
+        for view_key in self.data_views:
+            if self.data_views[view_key] == data_view:
+                assert data_view.name == c_LOCALFILE_ID
+                return view_key
+
+    def get_current_data_stores(self) -> list[DataStore]:
+        data_view = self.get_current_data_view()
+        return data_view.get_data_stores()
+
+    def acquire_data(self, data_view: DataView):
+        if data_view.is_local_file():
+            new_data_stores = data_view.load(self.get_local_file_name(data_view), self.data_stores)
+            self.handle_new_data_stores(new_data_stores)
         else:
-            with open(data_store.name, 'r') as openfile:
-                data = DataStore.data_from_stream(json.load(openfile))
-        units = data["units"]
-        data_store.data = {k: Signal(name=k, data=v, unit=units[k] if k in units else "") for k, v in data.items() if k != "units" and k in data_store.signals or k == DataStore.c_TIMESTAMP_ID}
-        UnitStandardizer().execute(units, data_store.data, data_store.signals)
-        data_store.end_timestamp = max(data_store.data[DataStore.c_TIMESTAMP_ID])
-        data_store.start_timestamp = min(data_store.data[DataStore.c_TIMESTAMP_ID])
-
-        try:
-            t_prev = None
-            for i, t in enumerate(data_store.data[DataStore.c_TIMESTAMP_ID]):
-                if i != 0:
-                    delta_t = t - t_prev
-                    if delta_t > {'real_time': 11, 'persistent': 66}[data_store.name]:
-                        print(f"delta = {delta_t} @ t = {datetime.fromtimestamp(t_prev)} > {datetime.fromtimestamp(t)}")
-                t_prev = t
-        except KeyError:
-            pass
-
-    def init_datastore_from_local_file(self, filename: str):
-        try:
-            with open(filename, 'r') as openfile:
+            for data_store in data_view.get_data_stores():
                 try:
-                    data = json.load(openfile)
-                except json.decoder.JSONDecodeError:
-                    return None
-        except FileNotFoundError:  # als de naam van de file wordt veranderd tijdens het proces van fileselectie
-            return None
-        data_store = DataStore.unserialize(data, filename)
-        self.data_stores.append(data_store)
+                    data = ServerRequests().get_data(data_store)
+                except ConnectionError as err:
+                    logging.debug(f"ConnectionError: {err}")
+                    return
+                data_store.set_data(data)
+
+    def init_dataview_from_local_file(self, filename: str):
+        """
+        Maakt een nieuwe data_view aan. De database hiervan is van het type c_LOCAL_FILE, de naam ervan is de filenaam.
+        """
+        data_view = DataView(c_LOCALFILE_ID, specified_names={}, all_data_stores=self.data_stores)
+        self.data_views[filename] = data_view
 
     def get_time_range(self):
         return self.time_range
 
     def calc_derived_data(self, signals, time_range):
-        return DerivedQuantities(Settings().get_derived_quantities()).get_values(self.current_data_store, signals, time_range)
+        return DerivedQuantities(Settings().get_derived_quantities()).get_values(self.get_current_data_stores(), signals, time_range)
 
     @staticmethod
     def handle_derived_data(data_store: DataStore):
@@ -102,11 +116,11 @@ class Model:
         return Settings().getDerivedSignalColors()
 
     @staticmethod
-    def get_default_time_range(datastore: DataStore):
-        end_time = datastore.end_timestamp
-        min_time = datastore.start_timestamp
+    def get_default_time_range(data_stores: list[DataStore]) -> tuple[Optional[float]]:
+        end_time = min(data_store.end_timestamp for data_store in data_stores)
+        min_time = max(data_store.start_timestamp for data_store in data_stores)
         if end_time:
-            start_time = datetime.timestamp(datetime.fromtimestamp(end_time) - timedelta(hours=3))
+            start_time = datetime.timestamp(datetime.fromtimestamp(end_time) - timedelta(hours=Config().get_initial_plot_time_range_hours()))
             if start_time < min_time:
                 start_time = min_time
         else:

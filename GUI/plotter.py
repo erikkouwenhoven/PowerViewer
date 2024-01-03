@@ -7,7 +7,8 @@ from GUI.Tools.mplwidget import MplWidget
 from Utils.config import Config
 from GUI.Tools.time_format import plot_axis_fmt
 from Models.data_store import DataStore
-from Algorithms.binary_search import b_search
+from Models.data_view import DataView
+from Algorithms.binary_search import interval_to_range
 from Utils.unit_standardizer import UnitStandardizer
 
 
@@ -15,7 +16,7 @@ class Plotter:
     
     def __init__(self, mpl_widget: Type[MplWidget]):
         self.mpl_widget: Type[MplWidget] = mpl_widget
-        self.data_store = None
+        self.data_view: DataView = None
         self.visibility_change_notifier = None
         self.redraw_notifier = None
         self.colors = Config().get_colors()
@@ -49,58 +50,62 @@ class Plotter:
         self.mpl_widget.canvas.ax.clear()
         self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.DateFormatter(plot_axis_fmt))
         self.mpl_widget.canvas.ax.set_xlabel('time')
-        units = self.data_store.get_signals_grouped_unit()
-        axes_signals = {}
-        if self.twin_axes and len(units) <= 1:
-            self.twin_axes.remove()
-            self.twin_axes = None
-        for i_unit, unit in enumerate(units):
-            if i_unit == 0:
-                if self.twin_axes:
-                    self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
-                self.mpl_widget.canvas.ax.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
+        units = None
+        for data_store in self.data_view.get_data_stores():
+            units = data_store.combine_signals_grouped_units(units)
+        if units:
+            axes_signals = {}
+            if self.twin_axes and len(units) <= 1:
+                self.twin_axes.remove()
+                self.twin_axes = None
+            for i_unit, unit in enumerate(units):
+                if i_unit == 0:
+                    if self.twin_axes:
+                        self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                    self.mpl_widget.canvas.ax.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
 
-                axes_signals = {signal.name: self.mpl_widget.canvas.ax for signal in units[unit]}
-            elif i_unit == 1:
-                if self.twin_axes is None:
-                    self.twin_axes = self.mpl_widget.canvas.ax.twinx()
-                else:
-                    self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
-                self.twin_axes.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
-                axes_signals = axes_signals | {signal.name: self.twin_axes for signal in units[unit]}
-            else:
-                raise RuntimeError("Niet meer dan 2 assen mogelijk")
-        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
-        if self.data_store:
-            signals = [item for item in self.data_store.data if item != DataStore.c_TIMESTAMP_ID]
-            i_range = range(b_search(self.data_store.data[DataStore.c_TIMESTAMP_ID], self.time_range[0]),
-                            b_search(self.data_store.data[DataStore.c_TIMESTAMP_ID], self.time_range[1]) + 1)
-            time_data = [datetime.fromtimestamp(self.data_store.data[DataStore.c_TIMESTAMP_ID][idx]) for idx in i_range]
-            for signal in signals:
-                try:
-                    ax = axes_signals[signal] if signal in axes_signals else self.mpl_widget.canvas.ax  # de else heeft betrekking op derived signals
-                    signal_data = [self.data_store.data[signal][idx] for idx in i_range]
-                    if signal in Config().getBarPlotSignals():
-                        ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
+                    axes_signals = {signal.name: self.mpl_widget.canvas.ax for signal in units[unit]}
+                elif i_unit == 1:
+                    if self.twin_axes is None:
+                        self.twin_axes = self.mpl_widget.canvas.ax.twinx()
                     else:
-                        line_plot, = ax.plot(time_data, signal_data, color=self.colors[signal], label=signal)
-                        lines.append(line_plot)
-                except KeyError:
-                    print(f"Error {signal}")
-            leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes.legend(handles=lines)
-            self.lines = {}  # Will map legend lines to original lines.
-            for legend_text, origline in zip(leg.get_texts(), lines):
-                legend_text.set_picker(4)  # Enable picking on the legend line.
-                self.lines[legend_text] = origline
-                try:
-                    visibility = self.signal_visibilities[legend_text.get_text()]
-                except TypeError:
-                    visibility = True
-                    self.signal_visibilities = {legend_text.get_text(): visibility}
-                except KeyError:
-                    visibility = True
-                    self.signal_visibilities[legend_text.get_text()] = visibility
-                self.switch_visible(legend_text, visibility)
+                        self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                    self.twin_axes.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
+                    axes_signals = axes_signals | {signal.name: self.twin_axes for signal in units[unit]}
+                else:
+                    raise RuntimeError("Niet meer dan 2 assen mogelijk")
+        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
+        for data_store in self.data_view.get_data_stores():
+            if data_store and data_store.data and (t := data_store.data[DataStore.c_TIMESTAMP_ID]):
+                i_range = interval_to_range(t, self.time_range[0], self.time_range[1])
+                time_data = [datetime.fromtimestamp(data_store.data[DataStore.c_TIMESTAMP_ID][idx]) for idx in i_range]
+                signals = [item for item in data_store.data if item in self.data_view.get_signals(data_store) and item != DataStore.c_TIMESTAMP_ID]
+                for signal in signals:
+                    try:
+                        ax = axes_signals[signal] if signal in axes_signals else self.mpl_widget.canvas.ax  # de else heeft betrekking op derived signals
+                        signal_data = [data_store.data[signal][idx] for idx in i_range]
+                        if signal in Config().getBarPlotSignals():
+                            ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
+                        else:
+                            line_plot, = ax.plot(time_data, signal_data, color=self.colors[signal], label=signal,
+                                                 marker='o' if signal in Config().getSymbolPlotSignals() else '')
+                            lines.append(line_plot)
+                    except KeyError:
+                        print(f"Error {signal}")
+                leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes.legend(handles=lines)
+                self.lines = {}  # Will map legend lines to original lines.
+                for legend_text, origline in zip(leg.get_texts(), lines):
+                    legend_text.set_picker(4)  # Enable picking on the legend line.
+                    self.lines[legend_text] = origline
+                    try:
+                        visibility = self.signal_visibilities[legend_text.get_text()]
+                    except TypeError:
+                        visibility = True
+                        self.signal_visibilities = {legend_text.get_text(): visibility}
+                    except KeyError:
+                        visibility = True
+                        self.signal_visibilities[legend_text.get_text()] = visibility
+                    self.switch_visible(legend_text, visibility)
         if self.twin_axes:
             self.twin_axes.autoscale()
             print("autoscale")
@@ -134,13 +139,13 @@ class Plotter:
                         delta_x = 0.5 * x_range
                         time_range_start = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmin - delta_x)
                         time_range_end = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmax - delta_x)
-                        self.update_timerange(self.data_store, time_range_start, time_range_end, keep_range=True)
+                        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True)
                         self.update_plot()
                     elif event.xdata > self.mpl_widget.canvas.ax.dataLim.xmax - Config().getPanPlotRelativePosition() * x_range:
                         delta_x = 0.5 * x_range
                         time_range_start = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmin + delta_x)
                         time_range_end = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmax + delta_x)
-                        self.update_timerange(self.data_store, time_range_start, time_range_end, keep_range=True)
+                        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True)
                         self.update_plot()
                     else:
                         self.span_rect[0] = event.xdata
@@ -158,7 +163,7 @@ class Plotter:
                         try:
                             time_range_start = mdates.num2date(min(self.span_rect))
                             time_range_end = mdates.num2date(max(self.span_rect))
-                            self.update_timerange(self.data_store, time_range_start, time_range_end, force_range=True)
+                            self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, force_range=True)
                             self.update_plot()
                         except TypeError:  # mogelijk zijn er None-waarden in span_rect
                             pass
@@ -168,15 +173,19 @@ class Plotter:
                         self.span_rect = [None, None]
 
     def on_mouse_scroll_event(self, event):
-        range = (2.0 if event.step > 0 else 0.5) * (
-                self.mpl_widget.canvas.ax.dataLim.xmax - self.mpl_widget.canvas.ax.dataLim.xmin)
+        xmin = self.mpl_widget.canvas.ax.dataLim.xmin
+        xmax = self.mpl_widget.canvas.ax.dataLim.xmax
+        if self.twin_axes:
+            xmin = min(xmin, self.twin_axes.dataLim.xmin)
+            xmax = max(xmax, self.twin_axes.dataLim.xmax)
+        range = (2.0 if event.step > 0 else 0.5) * (xmax - xmin)
         center = (self.mpl_widget.canvas.ax.dataLim.xmin + self.mpl_widget.canvas.ax.dataLim.xmax) / 2.0
         time_range_start = mdates.num2date(center - range / 2.0)
         time_range_end = mdates.num2date(center + range / 2.0)
-        self.update_timerange(self.data_store, time_range_start, time_range_end)
+        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end)
         self.update_plot()
 
-    def update_timerange(self, datastore: DataStore, time_range_start: datetime, time_range_end: datetime,
+    def update_timerange(self, data_stores: list[DataStore], time_range_start: datetime, time_range_end: datetime,
                          keep_range: bool = False, force_range: bool = False):
         """
         Past de time_range aan die in gebruik is voor de plot op basis van de hier aangevraagde grenzen.
@@ -188,8 +197,8 @@ class Plotter:
         """
         req_time_range = time_range_end - time_range_start
         actual_time_range = datetime.fromtimestamp(self.time_range[1]) - datetime.fromtimestamp(self.time_range[0])
-        max_time = datastore.end_timestamp
-        min_time = datastore.start_timestamp
+        max_time = min(data_store.end_timestamp for data_store in data_stores)
+        min_time = max(data_store.start_timestamp for data_store in data_stores)
         if req_time_range < timedelta(minutes=Config().getMinPlottedTimeRangeInMinutes()):
             if force_range is False:
                 if keep_range is False and req_time_range <= actual_time_range:

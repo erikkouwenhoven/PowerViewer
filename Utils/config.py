@@ -79,6 +79,9 @@ class Config:
     def getCrossCorrKernelSize(self):
         return int(self.config.get('ALGORITHM', 'crosscorr_kernel_size'))
 
+    def get_initial_plot_time_range_hours(self):
+        return float(self.config.get('PLOTTING', 'initial_plot_time_range_hours'))
+
     def getSelectionTranslucency(self):
         return float(self.config.get('PLOTTING', 'translucency'))
 
@@ -90,6 +93,9 @@ class Config:
 
     def getBarPlotSignals(self):
         return self.config.get('PLOTTING', 'bar_plot').split()
+
+    def getSymbolPlotSignals(self):
+        return self.config.get('PLOTTING', 'symbol_plot').split()
 
     def get_colors(self) -> dict[str, str]:
         colors = {}

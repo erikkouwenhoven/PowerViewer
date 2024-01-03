@@ -1,6 +1,8 @@
 import json
 from Utils.config import Config
 from Algorithms.derived_signal import DerivedSignal
+from Models.data_store import DataStore
+from Models.data_view import DataView
 
 
 class Settings:
@@ -83,3 +85,11 @@ class Settings:
     def get_derived_quantities(self) -> dict[str, list]:
         if "DerivedQuantities" in self.settings:
             return {quantity: self.settings["DerivedQuantities"][quantity] for quantity in self.settings["DerivedQuantities"]}
+
+    def get_data_views(self, all_data_stores: list[DataStore]) -> dict[str, DataView]:
+        if "DataViews" in self.settings:
+            data_views = {}
+            for key in self.settings["DataViews"]:
+                data_view = DataView(key, self.settings["DataViews"][key], all_data_stores)
+                data_views[key] = data_view
+            return data_views

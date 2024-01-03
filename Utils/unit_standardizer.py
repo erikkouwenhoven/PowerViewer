@@ -1,5 +1,5 @@
 from Utils.config import Config
-from Models.data_store import Signal
+from Models.signal import Signal
 
 
 class UnitStandardizer:
@@ -10,7 +10,9 @@ class UnitStandardizer:
         'Power': {'W': 1, 'kW': 1000},
         'Energy': {'Wh': 1, 'kWh': 1000},
         'Volume': {'m3': 1},
-        'Usage': {'m3/h': 1}
+        'Usage': {'m3/h': 1},
+        'Temperature': {'C': 1},
+        'Rel. humidity': {'%': 1},
     }
 
     def __init__(self):
