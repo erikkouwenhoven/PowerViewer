@@ -34,6 +34,12 @@ class DataStore:
             except ValueError:
                 pass  # geen data
 
+    def get_time_signal(self) -> Signal:
+        return self.data[self.c_TIMESTAMP_ID]
+
+    def get_signal(self, signal_name: str) -> Signal:
+        return self.data[signal_name]
+
     def get_sampling_time(self):
         cum_delta = 0.0
         count_delta = 0

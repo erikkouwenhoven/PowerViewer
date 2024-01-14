@@ -1,15 +1,15 @@
 import os
-import json
 import logging
 from datetime import datetime
 from Utils.settings import Settings
 from Utils.config import Config
 from GUI.gui_view import GUIView
-from Models.model import Model
 from GUI.Tools.time_format import filename_fmt
+from Models.model import Model
 from Models.data_store import c_LOCALFILE_ID
 from Algorithms.signal_shift import SignalShift
 from GUI.time_delay_controller import TimeDelayController
+from GUI.exp_decay_controller import ExponentialDecayController
 
 
 class GUIController:
@@ -24,9 +24,13 @@ class GUIController:
                 'showSettings': self.activateSettings,
                 'dataStoreSelected': self.dataStoreSelected,
                 'signalsTableChanged': self.signalsTableChanged,
+                'calcExponentialDecay': self.calcExpDecay,
                 'calcSolarDelay': self.calcSolarDelay,
                 'reload': self.reload,
                 'saveData': self.save_data,
+                'serverQuerySelected': self.server_query,
+                'serverQueries': self.set_server_queries_page,
+                'graphPage': self.set_graph_page,
             }
         )
         self.initialize()
@@ -42,6 +46,7 @@ class GUIController:
         else:
             self.deactivateSettings()
         self.view.show_data_views(self.model.data_views)
+        self.view.show_server_queries(self.model.get_server_queries())
         self.view.set_visibility_change_notifier(self.visibility_changed)
         self.view.set_redraw_notifier(self.plot_redrawn)
 
@@ -91,6 +96,10 @@ class GUIController:
         self.view.show_derived_data(self.model.calc_derived_data(signals=self.view.plotter.get_displayed_signals(),
                                                                  time_range=self.view.plotter.time_range))
 
+    def calcExpDecay(self):
+        ExponentialDecayController(self.model.get_current_data_view(), signals=self.view.plotter.get_displayed_signals(),
+                                   time_range=self.view.plotter.time_range)
+
     def calcSolarDelay(self):
         for data_store in self.model.get_current_data_stores():
             signals = self.model.get_current_data_view().get_signals(data_store)
@@ -116,7 +125,18 @@ class GUIController:
                 filename += f"_{cnt}"
             else:
                 filename = filename.split('_')[0] + f"_{cnt}"
-        self.model.get_current_data_view().save(full_file_name, time_range)
+        self.model.get_current_data_view().save(full_file_name, signals, time_range)
+
+    def server_query(self):
+        path = self.view.get_server_query()
+        result = self.model.apply_query(path)
+        print(result)
+
+    def set_server_queries_page(self):
+        self.view.set_server_requests()
+
+    def set_graph_page(self):
+        self.view.set_graph_page()
 
     def acquire_and_show(self):
         if data_view := self.model.get_current_data_view():

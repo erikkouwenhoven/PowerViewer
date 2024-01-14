@@ -92,6 +92,12 @@ class Model:
                     return
                 data_store.set_data(data)
 
+    def get_server_queries(self) -> list[str]:
+        return ServerRequests().get_urls()
+
+    def apply_query(self, path: str):
+        return ServerRequests().apply_url(path)
+
     def init_dataview_from_local_file(self, filename: str):
         """
         Maakt een nieuwe data_view aan. De database hiervan is van het type c_LOCAL_FILE, de naam ervan is de filenaam.

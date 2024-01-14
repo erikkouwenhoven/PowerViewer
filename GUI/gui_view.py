@@ -32,9 +32,12 @@ class GUIView(QMainWindow):
 
     def initialize(self):
         self.setWindowTitle(f'{Config().getAppName()}  v.{Config().getVersion()}  (c) {Config().getAppInfo()}')
+        self.ui.stackedWidget.setCurrentWidget(self.ui.graphPage)
         # context menus
         self.ui.mpl_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.ui.mpl_widget.customContextMenuRequested.connect(self.showContextMenu)
+        self.ui.mpl_widget.customContextMenuRequested.connect(self.showGraphPageContextMenu)
+        self.ui.scrollArea.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.ui.scrollArea.customContextMenuRequested.connect(self.showQueriesPageContextMenu)
         # init data sources
         self.ui.datasourceComboBox.blockSignals(True)
         self.ui.datasourceComboBox.addItem(self.c_LOCALFILE_LABEL)
@@ -52,10 +55,18 @@ class GUIView(QMainWindow):
                 self.actionCallbacks['showSettings'] = value
             if key == "calcSolarDelay":
                 self.actionCallbacks['calcSolarDelay'] = value
+            if key == "calcExponentialDecay":
+                self.actionCallbacks['calcExponentialDecay'] = value
             if key == "reload":
                 self.actionCallbacks['reload'] = value
             if key == "saveData":
                 self.actionCallbacks['saveData'] = value
+            if key == "serverQuerySelected":
+                self.ui.serverQueriesComboBox.activated.connect(value)
+            if key == "serverQueries":
+                self.actionCallbacks['serverQueries'] = value
+            if key == "graphPage":
+                self.actionCallbacks['graphPage'] = value
 
     def set_visibility_change_notifier(self, visibility_change_notifier):
         self.plotter.set_visibility_change_notifier(visibility_change_notifier)
@@ -63,26 +74,41 @@ class GUIView(QMainWindow):
     def set_redraw_notifier(self, redraw_notifier):
         self.plotter.set_redraw_notifier(redraw_notifier)
 
-    def showContextMenu(self, position):
+    def showGraphPageContextMenu(self, position):
         menu = QMenu()
         settingsAction = menu.addAction("Control panel")
         solarDelayAction = menu.addAction("Solar delay")
+        exponentialDecayAction = menu.addAction("Exponential decay")
         reloadAction = menu.addAction("Reload")
         saveSubMenu = QMenu("Save")
         menu.addMenu(saveSubMenu)
         saveAsDisplayedAction = saveSubMenu.addAction("As displayed")
         saveCompleteAction = saveSubMenu.addAction("Complete")
+        menu.addSeparator()
+        serverQueriesAction = menu.addAction("Server queries")
+
         action = menu.exec(self.ui.mpl_widget.mapToGlobal(position))
         if action == settingsAction:
             self.actionCallbacks['showSettings']()
         elif action == solarDelayAction:
             self.actionCallbacks['calcSolarDelay']()
+        elif action == exponentialDecayAction:
+            self.actionCallbacks['calcExponentialDecay']()
         elif action == reloadAction:
             self.actionCallbacks['reload']()
         elif action == saveAsDisplayedAction:
             self.actionCallbacks['saveData'](signals=self.plotter.get_displayed_signals(), time_range=self.plotter.time_range)
         elif action == saveCompleteAction:
             self.actionCallbacks['saveData']()
+        elif action == serverQueriesAction:
+            self.actionCallbacks['serverQueries']()
+
+    def showQueriesPageContextMenu(self, position):
+        menu = QMenu()
+        graphPageAction = menu.addAction("Graphs")
+        action = menu.exec(self.ui.scrollArea.mapToGlobal(position))
+        if action == graphPageAction:
+            self.actionCallbacks['graphPage']()
 
     def hideSettings(self):
         self.ui.settingsGroupBox.setChecked(False)
@@ -91,6 +117,12 @@ class GUIView(QMainWindow):
     def showSettings(self):
         self.ui.settingsGroupBox.setChecked(True)
         self.ui.settingsGroupBox.setVisible(True)
+
+    def set_server_requests(self):
+        self.ui.stackedWidget.setCurrentWidget(self.ui.serverPage)
+
+    def set_graph_page(self):
+        self.ui.stackedWidget.setCurrentWidget(self.ui.graphPage)
 
     def getSignalsTable(self, data_store_name: str) -> dict[str, bool]:
         assert data_store_name == self.get_data_store_name()
@@ -112,6 +144,11 @@ class GUIView(QMainWindow):
         self.ui.datasourceComboBox.addItems([data_view for data_view in data_views])
         self.ui.datasourceComboBox.blockSignals(False)
 
+    def show_server_queries(self, server_queries: list[str]):
+        self.ui.serverQueriesComboBox.blockSignals(True)
+        self.ui.serverQueriesComboBox.addItems([server_query for server_query in server_queries])
+        self.ui.serverQueriesComboBox.blockSignals(False)
+
     def get_data_store_name(self) -> str:
         current_text = self.ui.datasourceComboBox.currentText()
         if current_text != self.c_LOCALFILE_LABEL:
@@ -121,6 +158,9 @@ class GUIView(QMainWindow):
 
     def set_data_store_name(self, datastore_name: str) -> None:
         return self.ui.datasourceComboBox.setCurrentText(datastore_name)
+
+    def get_server_query(self) -> str:
+        return self.ui.serverQueriesComboBox.currentText()
 
     def show_signals_table(self, signal_check_states: dict[str, bool]):
         self.ui.signalsTableWidget.clearContents()

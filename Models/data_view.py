@@ -37,15 +37,15 @@ class DataView:
     def get_signals(self, data_store: DataStore) -> list[str]:
         return self.selection[data_store]
 
-    def serialize(self, full_file_name: str, idx_range=None):
+    def serialize(self, full_file_name: str, signals: list[str], idx_range=None):
         return {
             "view_name": self.name,
-            "data_stores": {data_store.name: data_store.serialize(signals=self.selection[data_store], time_range=idx_range, name=full_file_name) for data_store in self.selection}
+            "data_stores": {data_store.name: data_store.serialize(signals=[signal for signal in self.selection[data_store] if signals is None or signal in signals], time_range=idx_range, name=full_file_name) for data_store in self.selection}
         }
 
-    def save(self, full_file_name: str, time_range):
+    def save(self, full_file_name: str, signals: list[str], time_range):
         with open(full_file_name, "w") as openfile:
-            json.dump(self.serialize(full_file_name, time_range), openfile)
+            json.dump(self.serialize(full_file_name, signals, time_range), openfile)
 
     def load(self, full_file_name, all_data_stores):
         try:
@@ -61,13 +61,16 @@ class DataView:
     def unserialize(self, stream: dict, full_file_name: str) -> list[DataStore]:
         new_data_stores = []
         specified_names: Dict[str, List[str]] = {}
-        data_store_keys = [data_store_name for data_store_name in stream["data_stores"]]
-        for data_store_key in data_store_keys:
-            specified_names[data_store_key] = stream["data_stores"][data_store_key]["signals"]
-            data_store = DataStore.unserialize(stream["data_stores"][data_store_key], data_store_key)
-            data_store.set_data(DataStore.data_from_stream(stream["data_stores"][data_store_key], data_store))
-            new_data_stores.append(data_store)
-        self.name = stream["view_name"]
+        try:
+            data_store_keys = [data_store_name for data_store_name in stream["data_stores"]]
+            for data_store_key in data_store_keys:
+                specified_names[data_store_key] = stream["data_stores"][data_store_key]["signals"]
+                data_store = DataStore.unserialize(stream["data_stores"][data_store_key], data_store_key)
+                data_store.set_data(DataStore.data_from_stream(stream["data_stores"][data_store_key], data_store))
+                new_data_stores.append(data_store)
+            self.name = stream["view_name"]
+        except KeyError:
+            raise RuntimeError("Invalid file format")
         self.selection = self.evaluate(specified_names, new_data_stores)
         return new_data_stores
 

@@ -86,7 +86,7 @@
         "CURRENT_USAGE_PHASE3": true,
         "CURRENT_PRODUCTION_PHASE1": false,
         "CURRENT_PRODUCTION_PHASE2": false,
-        "CURRENT_PRODUCTION_PHASE3": false,
+        "CURRENT_PRODUCTION_PHASE3": true,
         "Verbruik": true,
         "USAGE_GAS": true,
         "CUMULATIVE_GAS": true,

@@ -5,7 +5,6 @@ import matplotlib as mpl
 import mplcursors
 from GUI.Tools.mplwidget import MplWidget
 from Utils.config import Config
-from GUI.Tools.time_format import plot_axis_fmt
 from Models.data_store import DataStore
 from Models.data_view import DataView
 from Algorithms.binary_search import interval_to_range
@@ -48,7 +47,6 @@ class Plotter:
     def update_plot(self):
         lines = []  # the line plots
         self.mpl_widget.canvas.ax.clear()
-        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.DateFormatter(plot_axis_fmt))
         self.mpl_widget.canvas.ax.set_xlabel('time')
         units = None
         for data_store in self.data_view.get_data_stores():
@@ -85,11 +83,11 @@ class Plotter:
                         ax = axes_signals[signal] if signal in axes_signals else self.mpl_widget.canvas.ax  # de else heeft betrekking op derived signals
                         signal_data = [data_store.data[signal][idx] for idx in i_range]
                         if signal in Config().getBarPlotSignals():
-                            ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
+                            line_plot = ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
                         else:
                             line_plot, = ax.plot(time_data, signal_data, color=self.colors[signal], label=signal,
                                                  marker='o' if signal in Config().getSymbolPlotSignals() else '')
-                            lines.append(line_plot)
+                        lines.append(line_plot)
                     except KeyError:
                         print(f"Error {signal}")
                 leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes.legend(handles=lines)
@@ -108,7 +106,6 @@ class Plotter:
                     self.switch_visible(legend_text, visibility)
         if self.twin_axes:
             self.twin_axes.autoscale()
-            print("autoscale")
         if self.cursor:
             self.cursor.remove()
         self.cursor = mplcursors.cursor(lines, multiple=False)
@@ -123,7 +120,7 @@ class Plotter:
             legend_text = event.artist
             try:
                 origline = self.lines[legend_text]
-                self.switch_visible(legend_text, not origline.get_visible())
+                self.switch_visible(legend_text, not self.is_visible(origline))
                 self.mpl_widget.canvas.draw()
             except KeyError:  # the mplcursor is a legend too
                 pass
@@ -222,18 +219,33 @@ class Plotter:
         self.time_range = (start_time, end_time)
 
     def switch_visible(self, legend_text, visible):
-        origline = self.lines[legend_text]
-        if visible != origline.get_visible():
+        mpl_object = self.lines[legend_text]
+        if visible != self.is_visible(mpl_object):
             self.signal_visibilities[legend_text.get_text()] = visible
-            origline.set_visible(visible)
+            self.set_visible(mpl_object, visible)
             # Change the alpha on the line in the legend, so we can see what lines have been toggled.
             legend_text.set_alpha(1.0 if visible else 0.2)
             self.visibility_change_notifier()
 
-    def get_displayed_signals(self):
+    def get_displayed_signals(self) -> list[str]:
         return [signal for signal in self.signal_visibilities if self.signal_visibilities[signal] is True]
 
     def append_colors(self, colors: dict[str, str]) -> None:
         for name in colors:
             self.colors[name] = colors[name]
 
+    @staticmethod
+    def is_visible(mpl_object):
+        if isinstance(mpl_object, mpl.container.BarContainer):
+            vis = all(bar.get_visible() for bar in mpl_object)
+            return vis
+        else:
+            return mpl_object.get_visible()
+
+    @staticmethod
+    def set_visible(mpl_object, visibility: bool):
+        if isinstance(mpl_object, mpl.container.BarContainer):
+            for bar in mpl_object:
+                bar.set_visible(visibility)
+        else:
+            mpl_object.set_visible(visibility)

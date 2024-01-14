@@ -12,7 +12,6 @@ class ServerRequests:
 
     def get_data(self, data_store: DataStore):
         try:
-            # resp = requests.get(self.server_url(Config().get_data_url()) + data_store_name, headers={'Accept': 'application/json'})
             resp = requests.get(self.url_with_args(self.server_url(Config().get_data_url()),
                                 {'data_store_name': data_store.name, 'signals': data_store.signals_comma_separated()}),
                                 headers={'Accept': 'application/json'})
@@ -63,3 +62,25 @@ class ServerRequests:
     @staticmethod
     def server_url(path):
         return f"{Config().adapter()}{Config().server()}:{Config().port()}/{path}"
+
+    def get_urls(self) -> list[str]:
+        urls = [
+            'raw',
+            'dumpdata',
+            '',
+            'data_stores',
+            'data_store_info',
+            'get_data',
+            'shift_info',
+            'system_info',
+            'terminate'
+        ]
+        return urls
+
+    def apply_url(self, path: str):
+        try:
+            resp = requests.get(self.server_url(path), headers={'Accept': 'application/json'})
+            logging.debug(f"Received response on {path} query: {resp.json()}")
+            return resp.json()
+        except Exception:
+            logging.debug("Exception while querying get_shift_info()")

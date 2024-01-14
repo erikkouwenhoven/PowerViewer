@@ -54,6 +54,9 @@ class Config:
     def getTimeDelayDialogFileName(self):
         return self.config.get('UI', 'timedelay')
 
+    def getExpDecayDialogFileName(self):
+        return self.config.get('UI', 'exponentialdecay')
+
     def getAppName(self):
         return self.config.get('APPINFO', 'appname')
 
