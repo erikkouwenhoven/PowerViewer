@@ -1,4 +1,3 @@
-from typing import Optional
 from Algorithms.binary_search import interval_to_range
 from Models.data_store import DataStore
 
@@ -19,10 +18,10 @@ class DerivedQuantities:
         return res
 
     @staticmethod
-    def total_energy(data_store: DataStore, signal_name: str, time_range) -> Optional[float]:
+    def total_energy(data_store: DataStore, signal_name: str, time_range) -> float | None:
         signal = data_store.data[signal_name].fix_signal()
-        if time_range is not None:
-            i_range = interval_to_range(data_store.data[DataStore.c_TIMESTAMP_ID].data, time_range[0], time_range[1])
+        if (time_range is not None and
+                (i_range := interval_to_range(data_store.data[DataStore.c_TIMESTAMP_ID].data, time_range[0], time_range[1]))):
             data = [signal[i] for i in i_range]
         else:
             data = signal.data

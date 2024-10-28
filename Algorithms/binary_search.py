@@ -34,10 +34,11 @@ def b_search(array: list[float], value: float, rounding: Rounding = Rounding.NEA
             elif rounding is Rounding.DOWN:
                 return lo
 
+
 def interval_to_range(data: list[float], low_value: float, hi_value: float) -> range:
-    lo = b_search(data, low_value, Rounding.DOWN)
-    hi = b_search(data, hi_value, Rounding.UP)
-    return range(lo, hi)
+    if (lo := b_search(data, low_value, Rounding.DOWN)) is not None:
+        if (hi := b_search(data, hi_value, Rounding.UP)) is not None:
+            return range(lo, hi + 1)
 
 
 if __name__ == "__main__":

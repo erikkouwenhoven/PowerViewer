@@ -32,17 +32,70 @@
         "gas_cum_temp": {
             "CUMULATIVE_GAS": true
         },
-        "zwave_node2_temperature": {
-            "TEMPERATURE": true
+        "P1": {
+            "CURRENT_USAGE": true,
+            "CURRENT_PRODUCTION": true,
+            "CURRENT_USAGE_PHASE1": true,
+            "CURRENT_USAGE_PHASE2": true,
+            "CURRENT_USAGE_PHASE3": true,
+            "CURRENT_PRODUCTION_PHASE1": true,
+            "CURRENT_PRODUCTION_PHASE2": true,
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "CUMULATIVE_GAS": true
         },
-        "zwave_node2_humidity": {
-            "RELATIVE_HUMIDITY": true
+        "Solar": {
+            "SOLAR": true
         },
-        "zwave_node3_temperature": {
-            "TEMPERATURE": true
+        "zwave": {
+            "TEMPERATURE_2": true,
+            "RELATIVE_HUMIDITY_2": true,
+            "TEMPERATURE_3": true,
+            "RELATIVE_HUMIDITY_3": true
         },
-        "zwave_node3_humidity": {
-            "RELATIVE_HUMIDITY": true
+        "P1_Solar": {
+            "CURRENT_USAGE": true,
+            "CURRENT_PRODUCTION": true,
+            "CURRENT_USAGE_PHASE1": true,
+            "CURRENT_USAGE_PHASE2": true,
+            "CURRENT_USAGE_PHASE3": true,
+            "CURRENT_PRODUCTION_PHASE1": true,
+            "CURRENT_PRODUCTION_PHASE2": true,
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "SOLAR": true
+        },
+        "gas_daily": {
+            "USAGE_GAS": true
+        },
+        "gas_monthly": {
+            "USAGE_GAS": true
+        },
+        "verbruik_daily": {
+            "CURRENT_USAGE": true,
+            "CURRENT_PRODUCTION": true,
+            "CURRENT_USAGE_PHASE1": true,
+            "CURRENT_USAGE_PHASE2": true,
+            "CURRENT_USAGE_PHASE3": true,
+            "CURRENT_PRODUCTION_PHASE1": true,
+            "CURRENT_PRODUCTION_PHASE2": true,
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "SOLAR": true
+        },
+        "zwave_daily": {
+            "TEMPERATURE_2": true,
+            "RELATIVE_HUMIDITY_2": true,
+            "TEMPERATURE_3": true,
+            "RELATIVE_HUMIDITY_3": true
+        },
+        "meterstand": {
+            "CURRENT_USAGE": true,
+            "CURRENT_PRODUCTION": true,
+            "CURRENT_USAGE_PHASE1": true,
+            "CURRENT_USAGE_PHASE2": true,
+            "CURRENT_USAGE_PHASE3": true,
+            "CURRENT_PRODUCTION_PHASE1": true,
+            "CURRENT_PRODUCTION_PHASE2": true,
+            "CURRENT_PRODUCTION_PHASE3": true,
+            "CUMULATIVE_GAS": true
         }
     },
     "DerivedSignals": {
@@ -61,24 +114,24 @@
     },
     "DataViews": {
         "badkamer_heating": {
-            "persistent": [
+            "P1_Solar": [
                 "CURRENT_USAGE_PHASE3"
             ],
-            "zwave_node3_temperature": [
-                "TEMPERATURE"
+            "zwave": [
+                "TEMPERATURE_2"
             ]
         },
         "woonkamer_heating": {
             "gas_hourly": [
                 "USAGE_GAS"
             ],
-            "zwave_node2_temperature": [
-                "TEMPERATURE"
+            "zwave": [
+                "TEMPERATURE_3"
             ]
         }
     },
     "SignalVisibilities": {
-        "CURRENT_USAGE": false,
+        "CURRENT_USAGE": true,
         "CURRENT_PRODUCTION": false,
         "SOLAR": true,
         "CURRENT_USAGE_PHASE1": true,

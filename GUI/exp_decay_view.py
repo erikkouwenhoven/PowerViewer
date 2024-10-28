@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from datetime import datetime
 from PyQt6.QtWidgets import QDialog
 from PyQt6 import uic
@@ -22,7 +21,7 @@ class ExponentialDecayView(QDialog):
             if key == "fitButtonPressed":
                 self.ui.fitPushButton.clicked.connect(value)
 
-    def show_plot(self, coords: tuple[list[datetime], list[float]], title: str, ylabel: str, fit_coords: Optional[tuple[list[datetime], list[float]]] = None):
+    def show_plot(self, coords: tuple[list[datetime], list[float]], title: str, ylabel: str, fit_coords: tuple[list[datetime], list[float]] | None = None):
         self.ui.mpl_widget.canvas.ax.clear()
         self.ui.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(self.ui.mpl_widget.canvas.ax.xaxis.get_major_locator()))
         self.ui.mpl_widget.canvas.ax.plot(coords[0], coords[1], 'bo')

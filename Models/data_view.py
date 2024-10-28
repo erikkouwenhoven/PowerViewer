@@ -1,4 +1,3 @@
-from typing import Dict, List
 import json
 from Models.data_store import DataStore, c_LOCALFILE_ID
 
@@ -8,15 +7,15 @@ class DataView:
     Een view is een collectie van DataStores en een selectie van signals hiervan
     """
 
-    def __init__(self, name: str, specified_names: Dict[str, List[str]], all_data_stores: list[DataStore]):
+    def __init__(self, name: str, specified_names: dict[str, list[str]], all_data_stores: list[DataStore]):
         self.name = name
-        self.selection: dict[DataStore, List[str]] = self.evaluate(specified_names, all_data_stores)
+        self.selection: dict[DataStore, list[str]] = self.evaluate(specified_names, all_data_stores)
 
     @classmethod
     def from_data_store(cls, data_store, all_data_stores: list[DataStore]):
         return cls(data_store.name, {data_store.name: data_store.signals}, all_data_stores)
 
-    def evaluate(self, specified_names: dict[str, List[str]], data_stores: list[DataStore]) -> dict[DataStore, List[str]]:
+    def evaluate(self, specified_names: dict[str, list[str]], data_stores: list[DataStore]) -> dict[DataStore, list[str]]:
         selection = {}
         for data_store_name in specified_names:
             handled = False  # check if data_store_name is present
@@ -28,7 +27,7 @@ class DataView:
                         raise RuntimeError
                 selection[sel_data_store] = specified_names[data_store_name]
             if handled is False:
-                raise RuntimeError
+                raise RuntimeError(f"Data store {data_store_name} unfound")
         return selection
 
     def get_data_stores(self) -> list[DataStore]:
@@ -60,7 +59,7 @@ class DataView:
 
     def unserialize(self, stream: dict, full_file_name: str) -> list[DataStore]:
         new_data_stores = []
-        specified_names: Dict[str, List[str]] = {}
+        specified_names: dict[str, list[str]] = {}
         try:
             data_store_keys = [data_store_name for data_store_name in stream["data_stores"]]
             for data_store_key in data_store_keys:

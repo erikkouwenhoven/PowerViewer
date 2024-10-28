@@ -1,6 +1,4 @@
 import logging
-from typing import Optional
-import json
 from datetime import datetime, timedelta
 from Models.data_store import DataStore, c_LOCALFILE_ID
 from Models.data_view import DataView
@@ -21,7 +19,7 @@ class Model:
         self.time_range = None
         self.data_stores: list[DataStore] = self.init_data_stores()
         self.data_views: dict[str, DataView] = self.init_data_views()
-        self.current_data_view_name: Optional[str] = None
+        self.current_data_view_name: str | None = None
 
     def init_data_stores(self) -> list[DataStore]:
         data_stores = []
@@ -35,7 +33,7 @@ class Model:
             logging.debug(f"Connection error {err}")
         return data_stores
 
-    def init_data_views(self) -> Optional[dict[str, DataView]]:
+    def init_data_views(self) -> dict[str, DataView] | None:
         if all_data_stores := self.data_stores:
             data_views = Settings().get_data_views(all_data_stores)
             for data_store in self.data_stores:
@@ -122,7 +120,7 @@ class Model:
         return Settings().getDerivedSignalColors()
 
     @staticmethod
-    def get_default_time_range(data_stores: list[DataStore]) -> tuple[Optional[float]]:
+    def get_default_time_range(data_stores: list[DataStore]) -> tuple[float | None]:
         end_time = min(data_store.end_timestamp for data_store in data_stores)
         min_time = max(data_store.start_timestamp for data_store in data_stores)
         if end_time:
