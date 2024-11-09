@@ -140,7 +140,8 @@ class GUIController:
 
     def acquire_and_show(self):
         if data_view := self.model.get_current_data_view():
-            self.model.acquire_data(data_view)
+            if transfer_info := self.model.acquire_data(data_view):
+                self.view.show_transfer_info(transfer_info)
             for data_store in self.model.get_current_data_stores():
                 Model.handle_derived_data(data_store)
             self.view.append_colors(Model.get_derived_colors())

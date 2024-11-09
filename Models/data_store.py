@@ -41,15 +41,8 @@ class DataStore:
         return self.data[signal_name]
 
     def get_sampling_time(self):
-        cum_delta = 0.0
-        count_delta = 0
-        prev_t = None
-        for t in self.data[self.c_TIMESTAMP_ID]:
-            if prev_t is not None:
-                cum_delta += t - prev_t
-                count_delta += 1
-            prev_t = t
-        return cum_delta / count_delta
+        if (n_samples := len(self.data[self.c_TIMESTAMP_ID])) > 1:
+            return (self.end_timestamp - self.start_timestamp) / (n_samples - 1)
 
     def signals_comma_separated(self) -> str:
         return ",".join(self.signals)

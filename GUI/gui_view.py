@@ -3,13 +3,14 @@ from datetime import datetime
 from GUI.Tools.time_format import data_range_fmt
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMainWindow, QTableWidgetItem, QMenu, QFileDialog
+from PyQt6.QtWidgets import QMainWindow, QTableWidgetItem, QMenu, QFileDialog, QStatusBar
 from Utils.config import Config
 from Utils.settings import Settings
 from GUI.plotter import Plotter
 from Models.data_store import DataStore
 from Models.data_view import DataView
 from Models.data_store import c_LOCALFILE_ID
+from ServerRequests.server_requests import TransferInfo  # TODO naar Utils
 
 
 class GUIView(QMainWindow):
@@ -33,6 +34,7 @@ class GUIView(QMainWindow):
     def initialize(self):
         self.setWindowTitle(f'{Config().getAppName()}  v.{Config().getVersion()}  (c) {Config().getAppInfo()}')
         self.ui.stackedWidget.setCurrentWidget(self.ui.graphPage)
+        self.setStatusBar(QStatusBar())
         # context menus
         self.ui.mpl_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.ui.mpl_widget.customContextMenuRequested.connect(self.showGraphPageContextMenu)
@@ -201,3 +203,6 @@ class GUIView(QMainWindow):
                 self.ui.deductionsTableWidget.setItem(row, 1, QTableWidgetItem(f"{derived_data[signal]:.3f}"))
             except TypeError:
                 self.ui.deductionsTableWidget.setItem(row, 1, QTableWidgetItem("-"))
+
+    def show_transfer_info(self, transfer_info: TransferInfo):
+        self.statusBar().showMessage(str(transfer_info))

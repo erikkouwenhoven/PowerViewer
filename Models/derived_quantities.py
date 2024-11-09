@@ -25,8 +25,7 @@ class DerivedQuantities:
             data = [signal[i] for i in i_range]
         else:
             data = signal.data
-        conv_factor = data_store.get_sampling_time() / 3600.0 / 1000.0
         try:
-            return sum(data) * conv_factor
+            return sum(data) * data_store.get_sampling_time() / 3600.0 / 1000.0
         except TypeError:
             return None

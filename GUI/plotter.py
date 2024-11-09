@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 from matplotlib.lines import Line2D
 from matplotlib.container import BarContainer
+from matplotlib.patches import Rectangle
 from matplotlib import backend_bases
-import matplotlib as mpl
 import mplcursors
 from GUI.Tools.mplwidget import MplWidget
 from Utils.config import Config
@@ -25,7 +25,7 @@ class Plotter:
         self.signal_visibilities: dict[str, bool] | None = None  # Dict mapping signal name to on/off status
         self.lines: dict[str, Line2D] = {}  # Dict mapping legend text to line, enabling hiding/showing
         self.span_rect = [None, None]
-        self.aspan = None
+        self.aspan: Rectangle | None = None
         self.cursor = None
         self.twin_axes = None
         self.connect_mpl_events()
@@ -63,7 +63,6 @@ class Plotter:
                     if self.twin_axes:
                         self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
                     self.mpl_widget.canvas.ax.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
-
                     axes_signals = {signal.name: self.mpl_widget.canvas.ax for signal in units[unit]}
                 elif i_unit == 1:
                     if self.twin_axes is None:

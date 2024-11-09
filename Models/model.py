@@ -7,6 +7,7 @@ from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
 from Utils.settings import Settings
 from Utils.config import Config
+from ServerRequests.server_requests import TransferInfo
 
 
 class Model:
@@ -77,18 +78,23 @@ class Model:
         data_view = self.get_current_data_view()
         return data_view.get_data_stores()
 
-    def acquire_data(self, data_view: DataView):
+    def acquire_data(self, data_view: DataView) -> TransferInfo | None:
         if data_view.is_local_file():
             new_data_stores = data_view.load(self.get_local_file_name(data_view), self.data_stores)
             self.handle_new_data_stores(new_data_stores)
         else:
+            transfer_info = None
             for data_store in data_view.get_data_stores():
                 try:
-                    data = ServerRequests().get_data(data_store)
+                    data, transfer_info = ServerRequests().get_data(data_store)
                 except ConnectionError as err:
                     logging.debug(f"ConnectionError: {err}")
                     return
+                except TypeError as err:
+                    logging.debug(f"TypeError: {err}")
+                    return
                 data_store.set_data(data)
+            return transfer_info
 
     def get_server_queries(self) -> list[str]:
         return ServerRequests().get_urls()
