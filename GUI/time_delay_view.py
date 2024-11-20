@@ -13,7 +13,7 @@ class TimeDelayView(QDialog):
         self.initialize()
 
     def initialize(self):
-        pass
+        self.setWindowTitle(f"Shift {Config().get_signal_to_shift()} against {Config().get_ref_shift_signal()}")
 
     def show_plot(self, cross_corr, shift_in_samples, sampling_time):
         t = cross_corr[0]

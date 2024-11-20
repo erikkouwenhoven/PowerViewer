@@ -17,18 +17,18 @@ class ExponentialDecayController:
                 'fitButtonPressed': self.fit,
             }
         )
-        self.fit()
-        # self.view.show_plot(self.coords, title=self.title, ylabel=self.ylabel)
+        if self.coords:
+            self.fit()
         self.view.exec()
 
     def extract_coordinates(self, data_view: DataView, signals: list[str], time_range: tuple[float, float]) -> tuple[list[datetime], list[float]]:
         for data_store in data_view.get_data_stores():
             for signal in data_view.get_signals(data_store):
                 if signal in signals:
-                    i_range = interval_to_range(data_store.get_time_signal().data, time_range[0], time_range[1])
-                    time_data = [datetime.fromtimestamp(data_store.get_time_signal().data[idx]) for idx in i_range]
-                    signal_data = [data_store.get_signal(signal)[idx] for idx in i_range]
-                    return time_data, signal_data
+                    if i_range := interval_to_range(data_store.get_time_signal().data, time_range[0], time_range[1]):
+                        time_data = [datetime.fromtimestamp(data_store.get_time_signal().data[idx]) for idx in i_range]
+                        signal_data = [data_store.get_signal(signal)[idx] for idx in i_range]
+                        return time_data, signal_data
 
     def extract_labeling(self, data_view: DataView, signals: list[str]) -> tuple[str, str]:
         for data_store in data_view.get_data_stores():

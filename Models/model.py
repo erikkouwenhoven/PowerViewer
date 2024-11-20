@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from Models.data_store import DataStore, c_LOCALFILE_ID
-from Models.data_view import DataView
+from Models.data_view import DataView, PlotRepresentation
 from Models.derived_quantities import DerivedQuantities
 from ServerRequests.server_requests import ServerRequests
 from requests.exceptions import ConnectionError
@@ -38,7 +38,10 @@ class Model:
         if all_data_stores := self.data_stores:
             data_views = Settings().get_data_views(all_data_stores)
             for data_store in self.data_stores:
-                data_views[data_store.name] = DataView.from_data_store(data_store, self.data_stores)
+                data_view = DataView.from_data_store(data_store, self.data_stores)
+                if data_view.name in Config().get_bar_plot_data_views():
+                    data_view.plot_representation = PlotRepresentation.BAR
+                data_views[data_store.name] = data_view
             return data_views
         else:
             return {}

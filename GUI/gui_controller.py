@@ -16,6 +16,7 @@ class GUIController:
     """ Controller voor het main screen """
 
     def __init__(self):
+
         self.view = GUIView()
         self.model = Model()
         self.view.connectEvents(
@@ -31,6 +32,7 @@ class GUIController:
                 'serverQuerySelected': self.server_query,
                 'serverQueries': self.set_server_queries_page,
                 'graphPage': self.set_graph_page,
+                'tableView': self.set_table_view,
             }
         )
         self.initialize()
@@ -51,10 +53,10 @@ class GUIController:
         self.view.set_redraw_notifier(self.plot_redrawn)
 
     def deactivateSettings(self):
-        self.view.hideSettings()
+        self.view.hide_settings()
 
     def activateSettings(self):
-        self.view.showSettings()
+        self.view.show_settings()
 
     def dataStoreSelected(self):
         if (datastore_name := self.view.get_data_store_name()) == c_LOCALFILE_ID:
@@ -79,7 +81,7 @@ class GUIController:
 
     def signalsTableChanged(self):
         for data_store in self.model.get_current_data_stores():
-            checks = self.view.getSignalsTable(data_store.name)
+            checks = self.view.get_signals_table(data_store.name)
             Settings().setSignalCheckStates(data_store.name, checks)
         self.model.update_data_stores()
         self.acquire_and_show()
@@ -103,12 +105,12 @@ class GUIController:
     def calcSolarDelay(self):
         for data_store in self.model.get_current_data_stores():
             signals = self.model.get_current_data_view().get_signals(data_store)
-            if "SOLAR" in signals and "CURRENT_PRODUCTION_PHASE3" in signals:
-                signal_shift = SignalShift(data_store.data["SOLAR"])
-                shift_in_samples = signal_shift.assess_shift(data_store.data["CURRENT_PRODUCTION_PHASE3"], kernel_size=Config().getCrossCorrKernelSize())
+            if Config().get_signal_to_shift() in signals and Config().get_ref_shift_signal() in signals:
+                signal_shift = SignalShift(data_store.data[Config().get_signal_to_shift()])
+                shift_in_samples = signal_shift.assess_shift(data_store.data[Config().get_ref_shift_signal()],
+                                                             kernel_size=Config().getCrossCorrKernelSize())
                 sampling_time = data_store.get_sampling_time()
                 TimeDelayController(signal_shift.cross_corr, shift_in_samples, sampling_time)
-                print(shift_in_samples)
 
     def reload(self):
         self.apply_data_store(self.model.get_current_data_view().name)
@@ -137,6 +139,11 @@ class GUIController:
 
     def set_graph_page(self):
         self.view.set_graph_page()
+        self.view.show_data(Model.get_default_time_range(self.model.get_current_data_stores()), self.model.get_current_data_view())
+
+    def set_table_view(self):
+        self.view.set_table_view(self.model.get_current_data_view())
+        self.view.show_data(Model.get_default_time_range(self.model.get_current_data_stores()), self.model.get_current_data_view())
 
     def acquire_and_show(self):
         if data_view := self.model.get_current_data_view():

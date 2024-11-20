@@ -41,7 +41,11 @@
             "CURRENT_PRODUCTION_PHASE1": true,
             "CURRENT_PRODUCTION_PHASE2": true,
             "CURRENT_PRODUCTION_PHASE3": true,
-            "CUMULATIVE_GAS": true
+            "CUMULATIVE_GAS": true,
+            "USAGE_TARIFF_1": true,
+            "USAGE_TARIFF_2": true,
+            "PRODUCTION_TARIFF_1": true,
+            "PRODUCTION_TARIFF_2": true
         },
         "Solar": {
             "SOLAR": true
@@ -95,7 +99,11 @@
             "CURRENT_PRODUCTION_PHASE1": true,
             "CURRENT_PRODUCTION_PHASE2": true,
             "CURRENT_PRODUCTION_PHASE3": true,
-            "CUMULATIVE_GAS": true
+            "CUMULATIVE_GAS": true,
+            "USAGE_TARIFF_1": true,
+            "USAGE_TARIFF_2": true,
+            "PRODUCTION_TARIFF_1": true,
+            "PRODUCTION_TARIFF_2": true
         }
     },
     "DerivedSignals": {
@@ -132,18 +140,22 @@
     },
     "SignalVisibilities": {
         "CURRENT_USAGE": false,
-        "CURRENT_PRODUCTION": true,
+        "CURRENT_PRODUCTION": false,
         "SOLAR": true,
         "CURRENT_USAGE_PHASE1": true,
         "CURRENT_USAGE_PHASE2": true,
         "CURRENT_USAGE_PHASE3": true,
         "CURRENT_PRODUCTION_PHASE1": false,
         "CURRENT_PRODUCTION_PHASE2": false,
-        "CURRENT_PRODUCTION_PHASE3": false,
+        "CURRENT_PRODUCTION_PHASE3": true,
         "Verbruik": true,
         "USAGE_GAS": true,
         "CUMULATIVE_GAS": true,
         "RELATIVE_HUMIDITY": true,
-        "TEMPERATURE": true
+        "TEMPERATURE": true,
+        "USAGE_TARIFF_1": true,
+        "USAGE_TARIFF_2": true,
+        "PRODUCTION_TARIFF_1": true,
+        "PRODUCTION_TARIFF_2": true
     }
 }

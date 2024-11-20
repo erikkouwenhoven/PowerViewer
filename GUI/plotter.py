@@ -8,7 +8,7 @@ import mplcursors
 from GUI.Tools.mplwidget import MplWidget
 from Utils.config import Config
 from Models.data_store import DataStore
-from Models.data_view import DataView
+from Models.data_view import DataView, PlotRepresentation
 from Algorithms.binary_search import interval_to_range
 from Utils.unit_standardizer import UnitStandardizer
 
@@ -53,37 +53,42 @@ class Plotter:
         units = None
         for data_store in self.data_view.get_data_stores():
             units = data_store.combine_signals_grouped_units(units)
+        axes_signals = {}
         if units:
-            axes_signals = {}
             if self.twin_axes and len(units) <= 1:
-                self.twin_axes.remove()
+                for twin_axis in self.twin_axes:
+                    twin_axis.remove()
                 self.twin_axes = None
             for i_unit, unit in enumerate(units):
                 if i_unit == 0:
                     if self.twin_axes:
-                        self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                        for twin_axis in self.twin_axes:
+                            twin_axis.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
                     self.mpl_widget.canvas.ax.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
                     axes_signals = {signal.name: self.mpl_widget.canvas.ax for signal in units[unit]}
-                elif i_unit == 1:
+                elif i_unit >= 1:
                     if self.twin_axes is None:
-                        self.twin_axes = self.mpl_widget.canvas.ax.twinx()
+                        self.twin_axes = [self.mpl_widget.canvas.ax.twinx()]
+                    elif len(self.twin_axes) < i_unit:
+                        self.twin_axes.append(self.mpl_widget.canvas.ax.twinx())
+                        self.twin_axes[i_unit - 1].spines['right'].set_position(('outward', 60))
                     else:
-                        self.twin_axes.clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
-                    self.twin_axes.set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
-                    axes_signals = axes_signals | {signal.name: self.twin_axes for signal in units[unit]}
-                else:
-                    raise RuntimeError("Niet meer dan 2 assen mogelijk")
-        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
+                        self.twin_axes[i_unit - 1].clear()  # kennelijk nodig omdat anders problemen optreden bij bijv. zooming
+                    self.twin_axes[i_unit - 1].set_ylabel(f"{UnitStandardizer().get_quantity(unit)} [{unit}]")
+                    axes_signals = axes_signals | {signal.name: self.twin_axes[i_unit - 1] for signal in units[unit]}
+        self.mpl_widget.canvas.ax.xaxis.set_major_formatter(
+            mdates.ConciseDateFormatter(self.mpl_widget.canvas.ax.xaxis.get_major_locator()))
         for data_store in self.data_view.get_data_stores():
             if data_store and data_store.data and (t := data_store.data[DataStore.c_TIMESTAMP_ID]):
                 if i_range := interval_to_range(t.data, self.time_range[0], self.time_range[1]):
                     time_data = [datetime.fromtimestamp(data_store.data[DataStore.c_TIMESTAMP_ID][idx]) for idx in i_range]
-                    signals = [item for item in data_store.data if item in self.data_view.get_signals(data_store) and item != DataStore.c_TIMESTAMP_ID]
+                    signals = [item for item in data_store.data if item in self.data_view.get_signals(data_store) and
+                               item != DataStore.c_TIMESTAMP_ID]
                     for signal in signals:
                         try:
                             ax = axes_signals[signal] if signal in axes_signals else self.mpl_widget.canvas.ax  # de else heeft betrekking op derived signals
                             signal_data = [data_store.data[signal][idx] for idx in i_range]
-                            if signal in Config().getBarPlotSignals():
+                            if self.data_view.plot_representation == PlotRepresentation.BAR:
                                 line_plot = ax.bar(time_data, signal_data, color=self.colors[signal], label=signal, width=timedelta(minutes=30))
                             else:
                                 line_plot, = ax.plot(time_data, signal_data, color=self.colors[signal], label=signal,
@@ -91,10 +96,10 @@ class Plotter:
                             lines.append(line_plot)
                         except KeyError:
                             print(f"Error {signal}")
-                    leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes.legend(handles=lines)
+                    leg = self.mpl_widget.canvas.ax.legend(handles=lines) if self.twin_axes is None else self.twin_axes[-1].legend(handles=lines)
                     self.lines = {}  # Will map legend lines to original lines.
                     for legend_text, origline in zip(leg.get_texts(), lines):
-                        legend_text.set_picker(4)  # Enable picking on the legend line.
+                        legend_text.set_picker(4)  # Enable picking on the legend text.
                         self.lines[legend_text] = origline
                         try:
                             visibility = self.signal_visibilities[legend_text.get_text()]
@@ -106,7 +111,8 @@ class Plotter:
                             self.signal_visibilities[legend_text.get_text()] = visibility
                         self.switch_visible(legend_text, visibility)
         if self.twin_axes:
-            self.twin_axes.autoscale()
+            for twin_axis in self.twin_axes:
+                twin_axis.autoscale()
         if self.cursor:
             self.cursor.remove()
         self.cursor = mplcursors.cursor(lines, multiple=False)
@@ -129,7 +135,7 @@ class Plotter:
             pass  # no artist
 
     def on_mouse_event(self, event):
-        if legend := (self.twin_axes.get_legend() if self.twin_axes else self.mpl_widget.canvas.ax.get_legend()):
+        if legend := (self.twin_axes[0].get_legend() if self.twin_axes else self.mpl_widget.canvas.ax.get_legend()):
             if not legend.get_window_extent().contains(event.x, event.y):
                 if event.name == 'button_press_event' and event.button == backend_bases.MouseButton.LEFT:
                     x_range = self.mpl_widget.canvas.ax.dataLim.xmax - self.mpl_widget.canvas.ax.dataLim.xmin
@@ -137,17 +143,18 @@ class Plotter:
                         delta_x = 0.5 * x_range
                         time_range_start = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmin - delta_x)
                         time_range_end = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmax - delta_x)
-                        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True)
-                        self.update_plot()
+                        if self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True):
+                            self.update_plot()
                     elif event.xdata > self.mpl_widget.canvas.ax.dataLim.xmax - Config().getPanPlotRelativePosition() * x_range:
                         delta_x = 0.5 * x_range
                         time_range_start = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmin + delta_x)
                         time_range_end = mdates.num2date(self.mpl_widget.canvas.ax.dataLim.xmax + delta_x)
-                        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True)
-                        self.update_plot()
+                        if self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, keep_range=True):
+                            self.update_plot()
                     else:
                         self.span_rect[0] = event.xdata
                 elif event.name == 'motion_notify_event':
+                    self.release_cursor()
                     if self.span_rect[0] is not None:
                         self.span_rect[1] = event.xdata
                         if self.aspan:
@@ -157,34 +164,43 @@ class Plotter:
                                                                        alpha=Config().getSelectionTranslucency())
                         self.mpl_widget.canvas.draw()
                 elif event.name == 'button_release_event' and event.button == backend_bases.MouseButton.LEFT:
-                    if self.span_rect[0] is not None and self.span_rect[1] is not None:
+                    if self.release_cursor() is True:
+                        self.span_rect[0] = None
+                    elif self.span_rect[0] is not None and self.span_rect[1] is not None:
                         try:
                             time_range_start = mdates.num2date(min(self.span_rect))
                             time_range_end = mdates.num2date(max(self.span_rect))
-                            self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, force_range=True)
-                            self.update_plot()
+                            if self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end, force_range=True):
+                                self.update_plot()
                         except TypeError:  # mogelijk zijn er None-waarden in span_rect
                             pass
-                        if self.aspan:
-                            self.aspan.remove()
-                            self.aspan = None
-                        self.span_rect = [None, None]
+                    if self.aspan:
+                        self.aspan.remove()
+                        self.aspan = None
+                    self.span_rect = [None, None]
 
     def on_mouse_scroll_event(self, event):
         xmin = self.mpl_widget.canvas.ax.dataLim.xmin
         xmax = self.mpl_widget.canvas.ax.dataLim.xmax
         if self.twin_axes:
-            xmin = min(xmin, self.twin_axes.dataLim.xmin)
-            xmax = max(xmax, self.twin_axes.dataLim.xmax)
+            for twin_axis in self.twin_axes:
+                xmin = min(xmin, twin_axis.dataLim.xmin)
+                xmax = max(xmax, twin_axis.dataLim.xmax)
         range = (2.0 if event.step > 0 else 0.5) * (xmax - xmin)
         center = (self.mpl_widget.canvas.ax.dataLim.xmin + self.mpl_widget.canvas.ax.dataLim.xmax) / 2.0
         time_range_start = mdates.num2date(center - range / 2.0)
         time_range_end = mdates.num2date(center + range / 2.0)
-        self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end)
-        self.update_plot()
+        if self.update_timerange(self.data_view.get_data_stores(), time_range_start, time_range_end):
+            self.update_plot()
+
+    def release_cursor(self) -> bool:
+        if len(self.cursor.selections) > 0:
+            self.cursor.remove_selection(self.cursor.selections[0])
+            return True
+        return False
 
     def update_timerange(self, data_stores: list[DataStore], time_range_start: datetime, time_range_end: datetime,
-                         keep_range: bool = False, force_range: bool = False):
+                         keep_range: bool = False, force_range: bool = False) -> bool:
         """
         Past de time_range aan die in gebruik is voor de plot op basis van de hier aangevraagde grenzen.
         Daarbij worden de grenzen van de beschikbare data in acht genomen. Verder:
@@ -217,7 +233,12 @@ class Plotter:
             start_time = min_time
             if keep_range is True:
                 end_time = min_time + orig_time_range
+        prev_time_range = self.time_range
         self.time_range = (start_time, end_time)
+        if prev_time_range != self.time_range:
+            return True
+        else:
+            return False
 
     def switch_visible(self, legend_text, visible):
         mpl_object = self.lines[legend_text]

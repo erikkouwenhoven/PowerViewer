@@ -76,6 +76,12 @@ class Config:
         """spaces separated, convert to list"""
         return self.config.get('DOMAIN', 'preferred_units').split()
 
+    def get_signal_to_shift(self):
+        return self.config.get('DOMAIN', 'signal_to_shift')
+
+    def get_ref_shift_signal(self):
+        return self.config.get('DOMAIN', 'ref_shift_signal')
+
     def getSearchRangeMaxCrossCorr(self):
         return float(self.config.get('ALGORITHM', 'search_range_max_crosscorr'))
 
@@ -94,8 +100,8 @@ class Config:
     def getPanPlotRelativePosition(self):
         return float(self.config.get('PLOTTING', 'pan_plot_relative_position'))
 
-    def getBarPlotSignals(self):
-        return self.config.get('PLOTTING', 'bar_plot').split()
+    def get_bar_plot_data_views(self) -> list[str]:
+        return self.config.get('PLOTTING', 'bar_plot_data_views').split()
 
     def getSymbolPlotSignals(self):
         return self.config.get('PLOTTING', 'symbol_plot').split()

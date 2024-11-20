@@ -1,5 +1,12 @@
 import json
+from enum import Enum, auto
 from Models.data_store import DataStore, c_LOCALFILE_ID
+
+
+class PlotRepresentation(Enum):
+
+    LINE = auto()
+    BAR = auto()
 
 
 class DataView:
@@ -7,9 +14,11 @@ class DataView:
     Een view is een collectie van DataStores en een selectie van signals hiervan
     """
 
-    def __init__(self, name: str, specified_names: dict[str, list[str]], all_data_stores: list[DataStore]):
+    def __init__(self, name: str, specified_names: dict[str, list[str]], all_data_stores: list[DataStore],
+                 plot_representation=PlotRepresentation.LINE):
         self.name = name
         self.selection: dict[DataStore, list[str]] = self.evaluate(specified_names, all_data_stores)
+        self.plot_representation = plot_representation
 
     @classmethod
     def from_data_store(cls, data_store, all_data_stores: list[DataStore]):

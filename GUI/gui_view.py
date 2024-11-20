@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMainWindow, QTableWidgetItem, QMenu, QFileDialog, Q
 from Utils.config import Config
 from Utils.settings import Settings
 from GUI.plotter import Plotter
+from GUI.table_view import TableView
 from Models.data_store import DataStore
 from Models.data_view import DataView
 from Models.data_store import c_LOCALFILE_ID
@@ -22,27 +23,26 @@ class GUIView(QMainWindow):
         set_redraw_notifier
     """
 
-    c_LOCALFILE_LABEL = 'Local file'
+    c_LOCAL_FILE_LABEL = 'Local file'
 
     def __init__(self):
         super().__init__()
         self.ui = uic.loadUi(os.path.join(Config().getUiDirName(), Config().getMainScreenFileName()), self)
         self.actionCallbacks = {}
         self.plotter = Plotter(self.ui.mpl_widget)
+        self.table_view = TableView(self.ui.tableWidget)
         self.initialize()
 
     def initialize(self):
         self.setWindowTitle(f'{Config().getAppName()}  v.{Config().getVersion()}  (c) {Config().getAppInfo()}')
-        self.ui.stackedWidget.setCurrentWidget(self.ui.graphPage)
+        self.ui.stackedWidget.setCurrentWidget(self.ui.plot)
         self.setStatusBar(QStatusBar())
         # context menus
-        self.ui.mpl_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.ui.mpl_widget.customContextMenuRequested.connect(self.showGraphPageContextMenu)
-        self.ui.scrollArea.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.ui.scrollArea.customContextMenuRequested.connect(self.showQueriesPageContextMenu)
+        self.ui.stackedWidget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.ui.stackedWidget.customContextMenuRequested.connect(self.show_graph_page_context_menu)
         # init data sources
         self.ui.datasourceComboBox.blockSignals(True)
-        self.ui.datasourceComboBox.addItem(self.c_LOCALFILE_LABEL)
+        self.ui.datasourceComboBox.addItem(self.c_LOCAL_FILE_LABEL)
         self.ui.datasourceComboBox.blockSignals(False)
 
     def connectEvents(self, commandDict):
@@ -69,6 +69,8 @@ class GUIView(QMainWindow):
                 self.actionCallbacks['serverQueries'] = value
             if key == "graphPage":
                 self.actionCallbacks['graphPage'] = value
+            if key == "tableView":
+                self.actionCallbacks['tableView'] = value
 
     def set_visibility_change_notifier(self, visibility_change_notifier):
         self.plotter.set_visibility_change_notifier(visibility_change_notifier)
@@ -76,7 +78,7 @@ class GUIView(QMainWindow):
     def set_redraw_notifier(self, redraw_notifier):
         self.plotter.set_redraw_notifier(redraw_notifier)
 
-    def showGraphPageContextMenu(self, position):
+    def show_graph_page_context_menu(self, position):
         menu = QMenu()
         settingsAction = menu.addAction("Control panel")
         solarDelayAction = menu.addAction("Solar delay")
@@ -87,7 +89,9 @@ class GUIView(QMainWindow):
         saveAsDisplayedAction = saveSubMenu.addAction("As displayed")
         saveCompleteAction = saveSubMenu.addAction("Complete")
         menu.addSeparator()
+        graphPageAction = menu.addAction("Graphs")
         serverQueriesAction = menu.addAction("Server queries")
+        tableViewAction = menu.addAction("Table view")
 
         action = menu.exec(self.ui.mpl_widget.mapToGlobal(position))
         if action == settingsAction:
@@ -102,31 +106,37 @@ class GUIView(QMainWindow):
             self.actionCallbacks['saveData'](signals=self.plotter.get_displayed_signals(), time_range=self.plotter.time_range)
         elif action == saveCompleteAction:
             self.actionCallbacks['saveData']()
+        elif action == graphPageAction:
+            self.actionCallbacks['graphPage']()
         elif action == serverQueriesAction:
             self.actionCallbacks['serverQueries']()
+        elif action == tableViewAction:
+            self.actionCallbacks['tableView']()
 
-    def showQueriesPageContextMenu(self, position):
-        menu = QMenu()
-        graphPageAction = menu.addAction("Graphs")
-        action = menu.exec(self.ui.scrollArea.mapToGlobal(position))
-        if action == graphPageAction:
-            self.actionCallbacks['graphPage']()
-
-    def hideSettings(self):
+    def hide_settings(self):
         self.ui.settingsGroupBox.setChecked(False)
         self.ui.settingsGroupBox.setVisible(False)
 
-    def showSettings(self):
+    def show_settings(self):
         self.ui.settingsGroupBox.setChecked(True)
         self.ui.settingsGroupBox.setVisible(True)
 
     def set_server_requests(self):
-        self.ui.stackedWidget.setCurrentWidget(self.ui.serverPage)
+        self.ui.stackedWidget.setCurrentWidget(self.ui.server)
 
     def set_graph_page(self):
-        self.ui.stackedWidget.setCurrentWidget(self.ui.graphPage)
+        self.ui.stackedWidget.setCurrentWidget(self.ui.plot)
 
-    def getSignalsTable(self, data_store_name: str) -> dict[str, bool]:
+    def set_table_view(self, data_view: DataView):
+        self.ui.stackedWidget.setCurrentWidget(self.ui.table)
+
+    def show_table_data(self, data_view: DataView):
+        self.table_view.show_data(data_view)
+
+    def is_plotter_view(self) -> bool:
+        return self.ui.stackedWidget.currentWidget() == self.ui.plot
+
+    def get_signals_table(self, data_store_name: str) -> dict[str, bool]:
         assert data_store_name == self.get_data_store_name()
         return {self.ui.signalsTableWidget.item(row, 0).text(): True if self.ui.signalsTableWidget.item(row, 0).checkState() == Qt.CheckState.Checked
                 else False for row in range(self.ui.signalsTableWidget.rowCount())}
@@ -135,11 +145,14 @@ class GUIView(QMainWindow):
         return self.plotter.signal_visibilities
 
     def show_data(self, time_range, data_view: DataView):
-        self.plotter.time_range = time_range
-        self.plotter.data_view = data_view
-        for data_store in data_view.get_data_stores():
-            self.plotter.set_signal_visibiities(Settings().get_checked_visibilities(data_store.name))
-        self.plotter.update_plot()
+        if self.is_plotter_view():
+            self.plotter.time_range = time_range
+            self.plotter.data_view = data_view
+            for data_store in data_view.get_data_stores():
+                self.plotter.set_signal_visibiities(Settings().get_checked_visibilities(data_store.name))
+            self.plotter.update_plot()
+        else:
+            self.show_table_data(data_view)
 
     def show_data_views(self, data_views: dict[str, DataView]):
         self.ui.datasourceComboBox.blockSignals(True)
@@ -153,7 +166,7 @@ class GUIView(QMainWindow):
 
     def get_data_store_name(self) -> str:
         current_text = self.ui.datasourceComboBox.currentText()
-        if current_text != self.c_LOCALFILE_LABEL:
+        if current_text != self.c_LOCAL_FILE_LABEL:
             return current_text
         else:
             return c_LOCALFILE_ID
@@ -183,7 +196,7 @@ class GUIView(QMainWindow):
             self.ui.fromDateTimeLabel.setText(min_time.strftime(data_range_fmt))
             self.ui.toDateTimeLabel.setText(max_time.strftime(data_range_fmt))
 
-    def isSettingsSelected(self) -> bool:
+    def is_settings_selected(self) -> bool:
         return self.ui.settingsGroupBox.isChecked()
 
     def append_colors(self, colors: dict[str, str]) -> None:

@@ -23,7 +23,7 @@ class ServerRequests:
             data = resp.json()
             result = TransferInfo(resp)
             logging.debug(f"Received data. # bytes: {len(resp.text)} in {resp.elapsed.microseconds / 1000} ms "
-                          f"({len(resp.text) / (resp.elapsed.microseconds)} MB/s)")
+                          f"({len(resp.text) / resp.elapsed.microseconds} MB/s)")
         except Exception as e:
             logging.debug(f"Could not receive data, error: {e}")
             return None
