@@ -132,6 +132,7 @@ class GUIController:
     def server_query(self):
         path = self.view.get_server_query()
         result = self.model.apply_query(path)
+        self.view.show_server_output(result)
         print(result)
 
     def set_server_queries_page(self):

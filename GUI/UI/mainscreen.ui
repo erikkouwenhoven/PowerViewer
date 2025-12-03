@@ -24,7 +24,7 @@
     <item>
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="plot">
        <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -90,21 +90,7 @@
          </layout>
         </item>
         <item>
-         <widget class="QScrollArea" name="scrollArea">
-          <property name="widgetResizable">
-           <bool>true</bool>
-          </property>
-          <widget class="QWidget" name="scrollAreaWidgetContents">
-           <property name="geometry">
-            <rect>
-             <x>0</x>
-             <y>0</y>
-             <width>532</width>
-             <height>579</height>
-            </rect>
-           </property>
-          </widget>
-         </widget>
+         <widget class="QTextEdit" name="server_outputTextEdit"/>
         </item>
        </layout>
       </widget>

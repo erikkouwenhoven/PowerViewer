@@ -12,7 +12,7 @@ class ServerRequests:
 
     def get_data(self, data_store: DataStore):
         """
-        Vraage beschikbare data op van data_store voor alle signalen.
+        Vraagt beschikbare data op van data_store voor alle signalen.
         Retourneert data en TransferInfo
         """
         result: TransferInfo | None = None
@@ -72,9 +72,10 @@ class ServerRequests:
 
     def get_urls(self) -> list[str]:
         urls = [
+            'home',
             'raw',
             'dumpdata',
-            '',
+            'performance_info',
             'data_stores',
             'data_store_info',
             'get_data',

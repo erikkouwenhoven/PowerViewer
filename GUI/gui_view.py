@@ -161,7 +161,7 @@ class GUIView(QMainWindow):
 
     def show_server_queries(self, server_queries: list[str]):
         self.ui.serverQueriesComboBox.blockSignals(True)
-        self.ui.serverQueriesComboBox.addItems([server_query for server_query in server_queries])
+        self.ui.serverQueriesComboBox.addItems(server_queries)
         self.ui.serverQueriesComboBox.blockSignals(False)
 
     def get_data_store_name(self) -> str:
@@ -216,6 +216,10 @@ class GUIView(QMainWindow):
                 self.ui.deductionsTableWidget.setItem(row, 1, QTableWidgetItem(f"{derived_data[signal]:.3f}"))
             except TypeError:
                 self.ui.deductionsTableWidget.setItem(row, 1, QTableWidgetItem("-"))
+
+    def show_server_output(self, text: str) -> None:
+        self.ui.server_outputTextEdit.clear()
+        self.ui.server_outputTextEdit.setText(str(text))
 
     def show_transfer_info(self, transfer_info: TransferInfo):
         self.statusBar().showMessage(str(transfer_info))
